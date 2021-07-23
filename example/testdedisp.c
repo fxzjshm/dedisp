@@ -90,7 +90,13 @@ void calc_stats_float(dedisp_float *a, dedisp_size n, dedisp_float *mean, dedisp
 
 int main(int argc, char* argv[])
 {
-  int          device_idx  = 0;
+  int          device_idx;
+  if (argc > 1) {
+    device_idx = atoi(argv[1]);
+  } else {
+    device_idx = 0;
+  }
+  printf("device_idx is %d\n", device_idx);
 
   dedisp_float sampletime_base = 250.0E-6; // Base is 250 microsecond time samples
   dedisp_float downsamp    = 1.0;
