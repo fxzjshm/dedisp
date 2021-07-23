@@ -23,13 +23,11 @@
 
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
-#include <vector>
+
+#include <vector> // For generate_dm_list
 #include <cmath>
-
 #include <algorithm>
- // For generate_dm_list
 
- // For scrunch_x2
 
 // Kernel tuning parameters
 #define DEDISP_BLOCK_SIZE       256
@@ -136,7 +134,7 @@ T scale_output(SumType sum, dedisp_size nchans) {
 	float scaled = (float)sum * out_range / (in_range * nchans) * factor;
 	// Clip to range when necessary
         scaled = (sizeof(T) == 4) ? scaled
-                                  : sycl::min(sycl::max(scaled, 0.), out_range);
+                                  : sycl::min(sycl::max(scaled, 0.f), out_range);
         return (T)scaled;
 }
 
@@ -165,7 +163,7 @@ void set_out_val(dedisp_byte* d_out, dedisp_size idx,
 // Note: out_stride should be in units of samples
 template<int IN_NBITS, int SAMPS_PER_THREAD,
 		 int BLOCK_DIM_X, int BLOCK_DIM_Y,
-		 bool USE_TEXTURE_MEM>
+		 bool USE_TEXTURE_MEM = false>
 
 void dedisperse_kernel(const dedisp_word*  d_in,
                        dedisp_size         nsamps,
@@ -188,7 +186,7 @@ void dedisperse_kernel(const dedisp_word*  d_in,
                        sycl::nd_item<3> item_ct1,
                        dedisp_float *c_delay_table,
                        dedisp_bool *c_killmask,
-                       dpct::image_accessor_ext<unsigned int, 1> t_in)
+                       dpct::image_accessor_ext<dedisp_word, 1> t_in)
 {
 	// Compute compile-time constants
 	enum {
@@ -248,22 +246,23 @@ void dedisperse_kernel(const dedisp_word*  d_in,
                                         .convert<unsigned int,
                                                  sycl::rounding_mode::rte>()[0];
 
-                                if( USE_TEXTURE_MEM ) { // Pre-Fermi path
-					// Loop over samples per thread
-					// Note: Unrolled to ensure the sum[] array is stored in regs
-                    #pragma unroll
-					for( dedisp_size s=0; s<SAMPS_PER_THREAD; ++s ) {
-						// Grab the word containing the sample from texture mem
-                                                dedisp_word sample = t_in.read(offset + s + delay);
-
-                                                // Extract the desired subword and accumulate
-						sum[s] +=
-							// TODO: Pre-Fermi cards are faster with 24-bit mul
-							/*__umul24*/(c_killmask[chan_idx] *//,
-									 extract_subword<IN_NBITS>(sample,chan_sub));
-					}
-				}
-				else { // Fermi path
+//
+//                if( USE_TEXTURE_MEM ) { // Pre-Fermi path
+//					// Loop over samples per thread
+//					// Note: Unrolled to ensure the sum[] array is stored in regs
+//                    #pragma unroll
+//					for( dedisp_size s=0; s<SAMPS_PER_THREAD; ++s ) {
+//						// Grab the word containing the sample from texture mem
+//                                                dedisp_word sample = t_in.read(offset + s + delay);
+//
+//                                                // Extract the desired subword and accumulate
+//						sum[s] +=
+//							// TODO: Pre-Fermi cards are faster with 24-bit mul
+//							/*__umul24*/(c_killmask[chan_idx] *//,
+//									 extract_subword<IN_NBITS>(sample,chan_sub));
+//					}
+//				}
+//				else { // Fermi path
 					// Note: Unrolled to ensure the sum[] array is stored in regs
                     #pragma unroll
 					for( dedisp_size s=0; s<SAMPS_PER_THREAD; ++s ) {
@@ -275,7 +274,7 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 							c_killmask[chan_idx] *
 							extract_subword<IN_NBITS>(sample, chan_sub);
 					}
-				}
+//				}
 			}
 		}
 		
@@ -334,7 +333,7 @@ bool check_use_texture_mem() {
         return use_texture_mem;
 }
 
-bool dedisperse(const dedisp_word*  d_in,
+bool dedisperse(/*const*/ dedisp_word*  d_in,
                 dedisp_size         in_stride,
                 dedisp_size         nsamps,
                 dedisp_size         in_nbits,
@@ -415,8 +414,9 @@ bool dedisperse(const dedisp_word*  d_in,
         // Divide and round up
 	dedisp_size nsamps_reduced = (nsamps - 1) / DEDISP_SAMPS_PER_THREAD + 1;
 
-        sycl::queue *stream = 0;
-
+        sycl::queue queue((sycl::default_selector()));
+        sycl::queue *stream = &(queue); // TODO
+		
         // Execute the kernel
 /*
 DPCT1049:13: The workgroup size passed to the SYCL kernel may exceed the limit.
@@ -426,21 +426,21 @@ workgroup size if needed.
 #define DEDISP_CALL_KERNEL(NBITS, USE_TEXTURE_MEM)                             \
         stream->submit(\
   [&](sycl::handler &cgh) {\
-    // init global memory\
+    /* init global memory */\
     c_delay_table.init(*stream);\
     c_killmask.init(*stream);\
 \
-    // pointers to device memory\
+    /* pointers to device memory */\
     auto c_delay_table_ptr_ct1 = c_delay_table.get_ptr();\
     auto c_killmask_ptr_ct1 = c_killmask.get_ptr();\
 \
-    // accessors to image objects\
+    /* accessors to image objects */\
     auto t_in_acc = t_in.get_access(cgh);\
 \
-    // sampler of image objects\
+    /* sampler of image objects*/\
     auto t_in_smpl = t_in.get_sampler();\
 \
-    // helper variables defined\
+    /* helper variables defined*/\
     auto d_in_ct0 = d_in;\
     auto nsamps_ct1 = nsamps;\
     auto nsamps_reduced_ct2 = nsamps_reduced;\
@@ -463,30 +463,31 @@ workgroup size if needed.
     cgh.parallel_for(\
       sycl::nd_range<3>(grid * block, block), \
       [=](sycl::nd_item<3> item_ct1) {\
-        dedisperse_kernel<NBITS, DEDISP_CALL_KERNEL, DEDISP_CALL, DEDISP_CALL, USE_TEXTURE_MEM>(d_in_ct0, nsamps_ct1, nsamps_reduced_ct2, nsamp_blocks_ct3, in_stride_ct4, dm_count_ct5, dm_stride_ct6, ndm_blocks_ct7, nchans_ct8, chan_stride_ct9, d_out_ct10, out_nbits_ct11, out_stride_ct12, d_dm_list_ct13, batch_in_stride_ct14, batch_dm_stride_ct15, batch_chan_stride_ct16, batch_out_stride_ct17, item_ct1, c_delay_table_ptr_ct1, c_killmask_ptr_ct1, dpct::image_accessor_ext<unsigned int, 1>(t_in_smpl, t_in_acc));\
+        dedisperse_kernel<NBITS, DEDISP_SAMPS_PER_THREAD,BLOCK_DIM_X,        \
+		              BLOCK_DIM_Y, USE_TEXTURE_MEM>(d_in_ct0, nsamps_ct1, nsamps_reduced_ct2, nsamp_blocks_ct3, in_stride_ct4, dm_count_ct5, dm_stride_ct6, ndm_blocks_ct7, nchans_ct8, chan_stride_ct9, d_out_ct10, out_nbits_ct11, out_stride_ct12, d_dm_list_ct13, batch_in_stride_ct14, batch_dm_stride_ct15, batch_chan_stride_ct16, batch_out_stride_ct17, item_ct1, c_delay_table_ptr_ct1, c_killmask_ptr_ct1, dpct::image_accessor_ext<unsigned int, 1>(t_in_smpl, t_in_acc));\
       });\
   });
 	// Note: Here we dispatch dynamically on nbits for supported values
-        if( use_texture_mem ) {
+    if( use_texture_mem ) {
 		switch( in_nbits ) {
-                        case 1: DEDISP_CALL_KERNEL(1, true) break;
-                        case 2: DEDISP_CALL_KERNEL(2, true) break;
-                        case 4: DEDISP_CALL_KERNEL(4, true) break;
-                        case 8: DEDISP_CALL_KERNEL(8, true) break;
-                        case 16: DEDISP_CALL_KERNEL(16, true) break;
-                        case 32: DEDISP_CALL_KERNEL(32, true) break;
-                        default: /* should never be reached */ break;
+            case 1:  DEDISP_CALL_KERNEL(1,true);  break;
+            case 2:  DEDISP_CALL_KERNEL(2,true);  break;
+            case 4:  DEDISP_CALL_KERNEL(4,true);  break;
+            case 8:  DEDISP_CALL_KERNEL(8,true);  break;
+            case 16: DEDISP_CALL_KERNEL(16,true); break;
+            case 32: DEDISP_CALL_KERNEL(32,true); break;
+            default: /* should never be reached */ break;
 		}
 	}
 	else {
 		switch( in_nbits ) {
-                        case 1: DEDISP_CALL_KERNEL(1, false) break;
-                        case 2: DEDISP_CALL_KERNEL(2, false) break;
-                        case 4: DEDISP_CALL_KERNEL(4, false) break;
-                        case 8: DEDISP_CALL_KERNEL(8, false) break;
-                        case 16: DEDISP_CALL_KERNEL(16, false) break;
-                        case 32: DEDISP_CALL_KERNEL(32, false) break;
-                        default: /* should never be reached */ break;
+			case 1:  DEDISP_CALL_KERNEL(1,false);  break;
+			case 2:  DEDISP_CALL_KERNEL(2,false);  break;
+			case 4:  DEDISP_CALL_KERNEL(4,false);  break;
+			case 8:  DEDISP_CALL_KERNEL(8,false);  break;
+			case 16: DEDISP_CALL_KERNEL(16,false); break;
+			case 32: DEDISP_CALL_KERNEL(32,false); break;
+            default: /* should never be reached */ break;
 		}
 	}
 #undef DEDISP_CALL_KERNEL
@@ -555,7 +556,7 @@ dedisp_error scrunch_x2(const dedisp_word* d_in,
         dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 	
-	using thrust::make_counting_iterator;
+	
 
         std::transform(oneapi::dpl::execution::make_device_policy(
                            dpct::get_default_queue()),
@@ -689,7 +690,7 @@ dedisp_error unpack(const dedisp_word* d_transposed,
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 	
-	using thrust::make_counting_iterator;
+	
 
         std::transform(oneapi::dpl::execution::make_device_policy(
                            dpct::get_default_queue()),

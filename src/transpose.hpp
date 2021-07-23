@@ -256,11 +256,8 @@ void Transpose<T>::transpose(const T *in, size_t width, size_t height,
                                             Transpose<T>::TILE_DIM + 1);
 
                                         // accessors to device memory
-                                        sycl::accessor<
-                                            PlaceHolder /*Fix the type
-                                                           mannually*/
-                                            ,
-                                            2, sycl::access_mode::read_write,
+                                        sycl::accessor<T, 2,
+                                            sycl::access_mode::read_write,
                                             sycl::access::target::local>
                                             tile_acc_ct1(tile_range_ct1, cgh);
 
@@ -280,11 +277,7 @@ void Transpose<T>::transpose(const T *in, size_t width, size_t height,
                                                         log2_grid_y_ct8,
                                                         item_ct1,
                                                         dpct::accessor<
-                                                            PlaceHolder /*Fix
-                                                                           the
-                                                                           type
-                                                                           mannually*/
-                                                            ,
+                                                            T,
                                                             dpct::local, 2>(
                                                             tile_acc_ct1,
                                                             tile_range_ct1));
@@ -309,11 +302,8 @@ void Transpose<T>::transpose(const T *in, size_t width, size_t height,
                                             Transpose<T>::TILE_DIM + 1);
 
                                         // accessors to device memory
-                                        sycl::accessor<
-                                            PlaceHolder /*Fix the type
-                                                           mannually*/
-                                            ,
-                                            2, sycl::access_mode::read_write,
+                                        sycl::accessor<T, 2,
+                                            sycl::access_mode::read_write,
                                             sycl::access::target::local>
                                             tile_acc_ct1(tile_range_ct1, cgh);
 
@@ -333,11 +323,7 @@ void Transpose<T>::transpose(const T *in, size_t width, size_t height,
                                                         log2_grid_y_ct8,
                                                         item_ct1,
                                                         dpct::accessor<
-                                                            PlaceHolder /*Fix
-                                                                           the
-                                                                           type
-                                                                           mannually*/
-                                                            ,
+                                                            T,
                                                             dpct::local, 2>(
                                                             tile_acc_ct1,
                                                             tile_range_ct1));

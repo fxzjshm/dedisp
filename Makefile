@@ -14,10 +14,11 @@ OPTIMISE  := -O3
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
 INCLUDE   := -I$(SRC_DIR) -I$(THRUST_DIR)
-LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
+# LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
+LIB       := -lstdc++
 
-SOURCES   := $(SRC_DIR)/dedisp.cu
-HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.cuh         \
+SOURCES   := $(SRC_DIR)/dedisp.dp.cpp
+HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
@@ -31,7 +32,7 @@ SO_FILE   := $(LIB_NAME)$(SO_EXT).$(MAJOR).$(MINOR)
 SO_NAME   := $(LIB_DIR)/$(SO_FILE)
 A_NAME    := $(LIB_DIR)/$(LIB_NAME)$(A_EXT)
 
-PTX_NAME  := ./dedisp_kernels.ptx
+# PTX_NAME  := ./dedisp_kernels.ptx
 
 all: shared
 
@@ -42,8 +43,7 @@ $(SO_NAME): $(SOURCES) $(HEADERS)
 	mkdir -p $(INCLUDE_DIR)
 	mkdir -p $(LIB_DIR)
 	mkdir -p $(OBJ_DIR)
-	$(NVCC) -c -Xcompiler "-fPIC -Wall" $(OPTIMISE) $(DEBUG) -arch=$(GPU_ARCH) $(INCLUDE) -o $(OBJ_DIR)/dedisp.o $(SRC_DIR)/dedisp.cu
-	$(GCC) -shared -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -o $(SO_NAME) $(OBJ_DIR)/dedisp.o $(LIB)
+	source $(ONEAPI_PATH)/setvars.sh && $(DPCPP) -shared -fPIC -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT).$(MAJOR)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT)
 	cp $(INTERFACE) $(INCLUDE_DIR)
@@ -60,10 +60,10 @@ $(SO_NAME): $(SOURCES) $(HEADERS)
 test: $(SO_NAME)
 	cd test; $(MAKE) $(MKARGS)
 
-ptx: $(PTX_NAME)
+# ptx: $(PTX_NAME)
 
-$(PTX_NAME): $(SOURCES) $(LIB_DIR)/libdedisp.so $(HEADERS)
-	$(NVCC) -ptx -Xcompiler "-fPIC -Wall" $(OPTIMISE) $(DEBUG) -arch=$(GPU_ARCH) $(INCLUDE) -o $(PTX_NAME) $(SRC_DIR)/dedisp.cu
+# $(PTX_NAME): $(SOURCES) $(LIB_DIR)/libdedisp.so $(HEADERS)
+# 	$(NVCC) -ptx -Xcompiler "-fPIC -Wall" $(OPTIMISE) $(DEBUG) -arch=$(GPU_ARCH) $(INCLUDE) -o $(PTX_NAME) $(SRC_DIR)/dedisp.cu
 
 doc: $(SRC_DIR)/dedisp.h Doxyfile
 	$(DOXYGEN) Doxyfile

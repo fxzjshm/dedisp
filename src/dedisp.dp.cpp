@@ -24,18 +24,20 @@
 //#define DEDISP_DEBUG
 //#define DEDISP_BENCHMARK
 
+#include <dedisp.h>
+
 #include <oneapi/dpl/execution>
 #include <oneapi/dpl/algorithm>
 #include <CL/sycl.hpp>
 #include <dpct/dpct.hpp>
-#include <dedisp.h>
+// For copying and scrunching the DM list
+#include <dpct/dpl_utils.hpp>
 
 #include <vector>
 #include <algorithm> // For std::fill
+#include <cmath>
 
-#include <dpct/dpl_utils.hpp>
 
-// For copying and scrunching the DM list
 
 #ifdef DEDISP_BENCHMARK
 #include <fstream>
@@ -72,7 +74,6 @@ using std::endl;
 typedef unsigned int dedisp_word;
 // Note: This must be included after the above #define and typedef
 #include "kernels.dp.hpp"
-#include <cmath>
 
 // Define plan structure
 struct dedisp_plan_struct {
@@ -91,11 +92,11 @@ struct dedisp_plan_struct {
 	std::vector<dedisp_bool>  killmask;     // size = nchans
 	std::vector<dedisp_size>  scrunch_list; // size = dm_count
 	// Device arrays
-        dpct::device_vector<dedisp_float> d_dm_list;
-        dpct::device_vector<dedisp_float> d_delay_table;
-        dpct::device_vector<dedisp_bool> d_killmask;
-        dpct::device_vector<dedisp_size> d_scrunch_list;
-        //StreamType stream;
+    dpct::device_vector<dedisp_float> d_dm_list;
+    dpct::device_vector<dedisp_float> d_delay_table;
+    dpct::device_vector<dedisp_bool> d_killmask;
+    dpct::device_vector<dedisp_size> d_scrunch_list;
+    //StreamType stream;
 	// Scrunching parameters
 	dedisp_bool  scrunching_enabled;
 	dedisp_float pulse_width;
@@ -199,8 +200,7 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
                 throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
-	int device_idx;
-        device_idx = dpct::dev_mgr::instance().current_device_id();
+	int device_idx = dpct::dev_mgr::instance().current_device_id();
 
         // Check for parameter errors
 	if( nchans > DEDISP_MAX_NCHANS ) {
@@ -374,7 +374,8 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
   return &dm_table[0];
 }
 
-dedisp_error dedisp_set_device(int device_idx) try {
+dedisp_error dedisp_set_device(int device_idx) {
+	try {
         /*
         DPCT1010:20: SYCL uses exceptions to report errors and does not use the
         error codes. The call was replaced with 0. You need to rewrite this
@@ -404,6 +405,7 @@ catch (sycl::exception const &exc) {
   std::cerr << exc.what() << "Exception caught at file:" << __FILE__
             << ", line:" << __LINE__ << std::endl;
   std::exit(1);
+}
 }
 
 dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
@@ -1084,7 +1086,8 @@ dedisp_error dedisp_execute(const dedisp_plan  plan,
 	                          flags);
 }
 
-dedisp_error dedisp_sync(void) try {
+dedisp_error dedisp_sync(void) {
+	try {
         /*
         DPCT1003:28: Migrated API does not return error code. (*, 0) is
         inserted. You may need to rewrite this code.
@@ -1098,6 +1101,7 @@ catch (sycl::exception const &exc) {
   std::cerr << exc.what() << "Exception caught at file:" << __FILE__
             << ", line:" << __LINE__ << std::endl;
   std::exit(1);
+}
 }
 
 void dedisp_destroy_plan(dedisp_plan plan)
