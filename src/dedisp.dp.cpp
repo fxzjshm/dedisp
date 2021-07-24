@@ -392,6 +392,9 @@ dedisp_error dedisp_set_device(int device_idx) {
         int error = (dpct::dev_mgr::instance().select_device(device_idx), 0);
         // Note: cudaErrorInvalidValue isn't a documented return value, but
 	//         it still gets returned :/
+#if defined(DEDISP_DEBUG) && DEDISP_DEBUG
+	printf("Currently using device %s\n", dpct::dev_mgr::instance().current_device().get_info<cl::sycl::info::device::name>().c_str());
+#endif
         if (101 == error || 1 == error)
                 throw_error(DEDISP_INVALID_DEVICE_INDEX);
         else if (708 == error)
@@ -431,7 +434,7 @@ dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 		// Set the killmask to all true
 		std::fill(plan->killmask.begin(), plan->killmask.end(), (dedisp_bool)true);
                 std::fill(oneapi::dpl::execution::make_device_policy(
-                              dpct::get_default_queue()),
+                              dpct::dev_mgr::instance().current_device().default_queue()),
                           plan->d_killmask.begin(), plan->d_killmask.end(),
                           (dedisp_bool) true);
         }
@@ -569,7 +572,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
         DPCT1003:24: Migrated API does not return error code. (*, 0) is
         inserted. You may need to rewrite this code.
         */
-        (dpct::get_default_queue().memcpy(
+        (dpct::dev_mgr::instance().current_device().default_queue().memcpy(
              c_delay_table.get_ptr(),
              dpct::get_raw_pointer(&plan->d_delay_table[0]),
              plan->nchans * sizeof(dedisp_float)),
@@ -586,7 +589,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
         DPCT1003:26: Migrated API does not return error code. (*, 0) is
         inserted. You may need to rewrite this code.
         */
-        (dpct::get_default_queue().memcpy(
+        (dpct::dev_mgr::instance().current_device().default_queue().memcpy(
              c_killmask.get_ptr(), dpct::get_raw_pointer(&plan->d_killmask[0]),
              plan->nchans * sizeof(dedisp_bool)),
          0);
@@ -718,7 +721,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif //  USE_SUBBAND_ALGORITHM
 	
 	// TODO: Eventually re-implement streams
-        sycl::queue *stream = 0; //(cudaStream_t)plan->stream;
+        sycl::queue *stream = &dpct::get_current_device().default_queue(); //(cudaStream_t)plan->stream;
 
 #ifdef DEDISP_BENCHMARK
 	Stopwatch copy_to_timer;
@@ -911,7 +914,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                         std::transform(
                                             oneapi::dpl::execution::
                                                 make_device_policy(
-                                                    dpct::get_default_queue()),
+                                                    dpct::dev_mgr::instance().current_device().default_queue()),
                                             plan->d_dm_list.begin() + dm_offset,
                                             plan->d_dm_list.begin() +
                                                 dm_offset + scrunch_count,

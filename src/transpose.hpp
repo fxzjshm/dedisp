@@ -1,5 +1,3 @@
-#include <CL/sycl.hpp>
-#include <dpct/dpct.hpp>
 /*
  *  Copyright 2012 Ben Barsdell
  *
@@ -24,6 +22,9 @@
  */
 
 #pragma once
+
+#include <CL/sycl.hpp>
+#include <dpct/dpct.hpp>
 
 namespace cuda_specs {
 	enum { MAX_GRID_DIMENSION = 65535 };
@@ -197,7 +198,10 @@ void Transpose<T>::transpose(const T *in, size_t width, size_t height,
 		return; //throw std::runtime_error("Transpose: width exceeds in_stride");
 	if( height > out_stride )
 		return; //throw std::runtime_error("Transpose: height exceeds out_stride");
-	
+    if(!stream){
+        stream = &dpct::dev_mgr::instance().current_device().default_queue();
+    }
+
 	// Specify thread decomposition (uses up-rounded divisions)
         sycl::range<3> tot_block_count(1, (height - 1) / TILE_DIM + 1,
                                        (width - 1) / TILE_DIM + 1);
