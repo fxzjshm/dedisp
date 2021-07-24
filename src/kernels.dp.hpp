@@ -187,11 +187,11 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 	};
 	
 	// Compute the thread decomposition
-        dedisp_size samp_block = item_ct1.get_group(2);
+        dedisp_size samp_block = item_ct1.get_group(0);
         dedisp_size dm_block = item_ct1.get_group(1) % ndm_blocks;
         dedisp_size batch_block = item_ct1.get_group(1) / ndm_blocks;
 
-        dedisp_size samp_idx = samp_block * BLOCK_DIM_X + item_ct1.get_local_id(2);
+        dedisp_size samp_idx = samp_block * BLOCK_DIM_X + item_ct1.get_local_id(0);
         dedisp_size dm_idx = dm_block * BLOCK_DIM_Y + item_ct1.get_local_id(1);
         dedisp_size batch_idx     = batch_block;
 	dedisp_size nsamp_threads = nsamp_blocks * BLOCK_DIM_X;
@@ -342,14 +342,13 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
 	
 	// Define thread decomposition
 	// Note: Block dimensions x and y represent time samples and DMs respectively
-        sycl::range<3> block(1, BLOCK_DIM_Y, BLOCK_DIM_X);
+        sycl::range<3> block(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
         // Note: Grid dimension x represents time samples. Dimension y represents
 	//         DMs and batch jobs flattened together.
 	
 	// Divide and round up
         dedisp_size nsamp_blocks =
-            (nsamps - 1) / ((dedisp_size)DEDISP_SAMPS_PER_THREAD * block[2]) +
-            1;
+            (nsamps - 1) / ((dedisp_size)DEDISP_SAMPS_PER_THREAD * block[0]) + 1;
         dedisp_size ndm_blocks = (dm_count - 1) / (dedisp_size)block[1] + 1;
 
         // Constrain the grid size to the maximum allowed
@@ -360,7 +359,7 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
                      (unsigned int)(MAX_CUDA_GRID_SIZE_Y / batch_size));
 
         // Note: We combine the DM and batch dimensions into one
-        sycl::range<3> grid(1, ndm_blocks * batch_size, nsamp_blocks);
+        sycl::range<3> grid(nsamp_blocks, ndm_blocks * batch_size, 1);
 
         // Divide and round up
 	dedisp_size nsamps_reduced = (nsamps - 1) / DEDISP_SAMPS_PER_THREAD + 1;
