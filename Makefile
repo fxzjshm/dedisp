@@ -22,6 +22,7 @@ HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
+CPP_FLAGS := -g
 
 LIB_NAME  := libdedisp
 SO_EXT    := .so
@@ -31,6 +32,7 @@ MINOR     := 0.1
 SO_FILE   := $(LIB_NAME)$(SO_EXT).$(MAJOR).$(MINOR)
 SO_NAME   := $(LIB_DIR)/$(SO_FILE)
 A_NAME    := $(LIB_DIR)/$(LIB_NAME)$(A_EXT)
+LD_FLAGS  := -shared -fPIC -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR)
 
 # PTX_NAME  := ./dedisp_kernels.ptx
 
@@ -43,7 +45,7 @@ $(SO_NAME): $(SOURCES) $(HEADERS)
 	mkdir -p $(INCLUDE_DIR)
 	mkdir -p $(LIB_DIR)
 	mkdir -p $(OBJ_DIR)
-	$(DPCPP) -shared -fPIC -g -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
+	$(DPCPP) $(LD_FLAGS) $(CPP_FLAGS) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT).$(MAJOR)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT)
 	cp $(INTERFACE) $(INCLUDE_DIR)
