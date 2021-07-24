@@ -163,8 +163,9 @@ void transpose_kernel(const T* in,
         sycl::nd_item::barrier(sycl::access::fence_space::local_space) for
         better performance, if there is no access to global memory.
         */
+#if !DPCPP_HOST_DEVICE_SERIAL
         item_ct1.barrier();
-
+#endif
         gpu_size_t index_out_x =
             blockIdx_y * Transpose<T>::TILE_DIM + item_ct1.get_local_id(2);
         // Avoid excess threads
