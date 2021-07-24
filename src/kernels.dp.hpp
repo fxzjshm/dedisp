@@ -37,12 +37,6 @@
 dpct::constant_memory<dedisp_float, 1> c_delay_table(DEDISP_MAX_NCHANS);
 dpct::constant_memory<dedisp_bool, 1> c_killmask(DEDISP_MAX_NCHANS);
 
-// Texture reference for input data
-/*
-DPCT1059:10: SYCL only supports 4-channel image format. Adjust the code.
-*/
-dpct::image_wrapper<unsigned int, 1> t_in;
-
 template<int NBITS, typename T=unsigned int>
 struct max_value {
 	static const T value = (((unsigned)1<<(NBITS-1))-1)*2+1;
@@ -162,8 +156,7 @@ void set_out_val(dedisp_byte* d_out, dedisp_size idx,
 //       E.g., Words bracketed: (t0c0,t0c1,t0c2,t0c3), (t1c0,t1c1,t1c2,t1c3),...
 // Note: out_stride should be in units of samples
 template<int IN_NBITS, int SAMPS_PER_THREAD,
-		 int BLOCK_DIM_X, int BLOCK_DIM_Y,
-		 bool USE_TEXTURE_MEM = false>
+		 int BLOCK_DIM_X, int BLOCK_DIM_Y>
 
 void dedisperse_kernel(const dedisp_word*  d_in,
                        dedisp_size         nsamps,
@@ -185,8 +178,7 @@ void dedisperse_kernel(const dedisp_word*  d_in,
                        dedisp_size         batch_out_stride,
                        sycl::nd_item<3> item_ct1,
                        dedisp_float *c_delay_table,
-                       dedisp_bool *c_killmask,
-                       dpct::image_accessor_ext<dedisp_word, 1> t_in)
+                       dedisp_bool *c_killmask)
 {
 	// Compute compile-time constants
 	enum {
@@ -318,21 +310,6 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 	} // End of DM loop
 }
 
-bool check_use_texture_mem() {
-	// Decides based on GPU architecture
-	int device_idx;
-        device_idx = dpct::dev_mgr::instance().current_device_id();
-        dpct::device_info device_props;
-        dpct::dev_mgr::instance().get_device(device_idx).get_device_info(device_props);
-        // Fermi runs worse with texture mem
-        /*
-        DPCT1005:11: The SYCL device version is different from CUDA Compute
-        Compatibility. You may need to rewrite this code.
-        */
-        bool use_texture_mem = (device_props.get_major_version() < 2);
-        return use_texture_mem;
-}
-
 bool dedisperse(/*const*/ dedisp_word*  d_in,
                 dedisp_size         in_stride,
                 dedisp_size         nsamps,
@@ -361,33 +338,7 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
 	};
 	
 	// Initialise texture memory if necessary
-	// --------------------------------------
-	// Determine whether we should use texture memory
-	bool use_texture_mem = check_use_texture_mem();
-	if( use_texture_mem ) {
-		dedisp_size chans_per_word = sizeof(dedisp_word)*BITS_PER_BYTE / in_nbits;
-		dedisp_size nchan_words    = nchans / chans_per_word;
-		dedisp_size input_words    = in_stride * nchan_words;
-		
-		// Check the texture size limit
-		if( input_words > MAX_CUDA_1D_TEXTURE_SIZE ) {
-			return false;
-		}
-		// Bind the texture memory
-                /*
-                DPCT1059:12: SYCL only supports 4-channel image format. Adjust
-                the code.
-                */
-                dpct::image_channel channel_desc = dpct::image_channel::create<dedisp_word>();
-                t_in.attach(d_in, input_words * sizeof(dedisp_word), channel_desc);
-#ifdef DEDISP_DEBUG
-		cudaError_t cuda_error = cudaGetLastError();
-		if( cuda_error != cudaSuccess ) {
-			return false;
-		}
-#endif // DEDISP_DEBUG
-	}
-	// --------------------------------------
+	// In SYCL, not necessary; and some devices do not support texture
 	
 	// Define thread decomposition
 	// Note: Block dimensions x and y represent time samples and DMs respectively
@@ -434,12 +385,6 @@ workgroup size if needed.
     auto c_delay_table_ptr_ct1 = c_delay_table.get_ptr();\
     auto c_killmask_ptr_ct1 = c_killmask.get_ptr();\
 \
-    /* accessors to image objects */\
-    auto t_in_acc = t_in.get_access(cgh);\
-\
-    /* sampler of image objects*/\
-    auto t_in_smpl = t_in.get_sampler();\
-\
     /* helper variables defined*/\
     auto d_in_ct0 = d_in;\
     auto nsamps_ct1 = nsamps;\
@@ -463,23 +408,15 @@ workgroup size if needed.
     cgh.parallel_for(\
       sycl::nd_range<3>(grid * block, block), \
       [=](sycl::nd_item<3> item_ct1) {\
-        dedisperse_kernel<NBITS, DEDISP_SAMPS_PER_THREAD,BLOCK_DIM_X,        \
-		              BLOCK_DIM_Y, USE_TEXTURE_MEM>(d_in_ct0, nsamps_ct1, nsamps_reduced_ct2, nsamp_blocks_ct3, in_stride_ct4, dm_count_ct5, dm_stride_ct6, ndm_blocks_ct7, nchans_ct8, chan_stride_ct9, d_out_ct10, out_nbits_ct11, out_stride_ct12, d_dm_list_ct13, batch_in_stride_ct14, batch_dm_stride_ct15, batch_chan_stride_ct16, batch_out_stride_ct17, item_ct1, c_delay_table_ptr_ct1, c_killmask_ptr_ct1, dpct::image_accessor_ext<unsigned int, 1>(t_in_smpl, t_in_acc));\
+        dedisperse_kernel<NBITS, DEDISP_SAMPS_PER_THREAD, BLOCK_DIM_X, BLOCK_DIM_Y> \
+		(d_in_ct0, nsamps_ct1, nsamps_reduced_ct2, nsamp_blocks_ct3, in_stride_ct4, \
+		dm_count_ct5, dm_stride_ct6, ndm_blocks_ct7, nchans_ct8, chan_stride_ct9, \
+		d_out_ct10, out_nbits_ct11, out_stride_ct12, d_dm_list_ct13, batch_in_stride_ct14, \
+		batch_dm_stride_ct15, batch_chan_stride_ct16, batch_out_stride_ct17, item_ct1, \
+		c_delay_table_ptr_ct1, c_killmask_ptr_ct1);\
       });\
   });
 	// Note: Here we dispatch dynamically on nbits for supported values
-    if( use_texture_mem ) {
-		switch( in_nbits ) {
-            case 1:  DEDISP_CALL_KERNEL(1,true);  break;
-            case 2:  DEDISP_CALL_KERNEL(2,true);  break;
-            case 4:  DEDISP_CALL_KERNEL(4,true);  break;
-            case 8:  DEDISP_CALL_KERNEL(8,true);  break;
-            case 16: DEDISP_CALL_KERNEL(16,true); break;
-            case 32: DEDISP_CALL_KERNEL(32,true); break;
-            default: /* should never be reached */ break;
-		}
-	}
-	else {
 		switch( in_nbits ) {
 			case 1:  DEDISP_CALL_KERNEL(1,false);  break;
 			case 2:  DEDISP_CALL_KERNEL(2,false);  break;
@@ -489,7 +426,7 @@ workgroup size if needed.
 			case 32: DEDISP_CALL_KERNEL(32,false); break;
             default: /* should never be reached */ break;
 		}
-	}
+	
 #undef DEDISP_CALL_KERNEL
 		
 	// Check for kernel errors
