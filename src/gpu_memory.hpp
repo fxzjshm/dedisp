@@ -1,5 +1,3 @@
-#include <CL/sycl.hpp>
-#include <dpct/dpct.hpp>
 /*
  *  Copyright 2012 Ben Barsdell
  *
@@ -22,66 +20,49 @@
 
 #pragma once
 
-typedef unsigned int gpu_size_t;
+#include <CL/opencl.hpp>
+using namespace cl;
+#include "utils.dp.hpp"
+// typedef unsigned int gpu_size_t;
 
-template <typename T> bool malloc_device(T *&addr, gpu_size_t count) try {
-        /*
-        DPCT1003:0: Migrated API does not return error code. (*, 0) is inserted.
-        You may need to rewrite this code.
-        */
-        int error = (addr = (T *)sycl::malloc_device(count * sizeof(T),
-                                                     dpct::get_default_queue()),
-                     0);
-
+template <typename T>
+bool malloc_device(cl::Buffer &addr, gpu_size_t count) {
+    cl_int error;
+    addr = cl::Buffer(dedisp::device_manager::instance().current_context(), CL_MEM_READ_WRITE, count * sizeof(T), nullptr, &error);
+	if( error != CL_SUCCESS ) {
+		return false;
+	}
         return true;
 }
-catch (sycl::exception const &exc) {
-  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-            << ", line:" << __LINE__ << std::endl;
-  std::exit(1);
-}
 template<typename T>
-void free_device(T*& addr) {
-        sycl::free(addr, dpct::get_default_queue());
-        addr = 0;
+void free_device(cl::Buffer &addr) {
+        std::move(addr);
 }
 template <typename T>
-bool copy_host_to_device(T *dst, const T *src, gpu_size_t count,
-                         sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-	// TODO: Passing a device pointer as src causes this to segfault
-        dpct::get_default_queue()
-            .memcpy /*Async*/ (dst, src, count * sizeof(T) /*, stream*/)
-            .wait();
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:1: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+bool copy_host_to_device(cl::Buffer& dst, const T* src, gpu_size_t count,
+                         const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    // TODO: Can't use Async versions unless host memory is pinned!
+    // TODO: Passing a device pointer as src causes this to segfault
+    stream.enqueueWriteBuffer(dst, CL_TRUE, 0, count * sizeof(T), src);
+    //#ifdef DEDISP_DEBUG
+    cl_int error = stream.finish();
+    if (error != CL_SUCCESS) {
+        return false;
+    }
+    //#endif
 	return true;
 }
 template <typename T>
-bool copy_device_to_host(T *dst, const T *src, gpu_size_t count,
-                         sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-        dpct::get_default_queue()
-            .memcpy /*Async*/ (dst, src, count * sizeof(T) /*, stream*/)
-            .wait();
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:2: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+bool copy_device_to_host(T *dst, cl::Buffer& src, gpu_size_t count,
+                         const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    // TODO: Can't use Async versions unless host memory is pinned!
+    stream.enqueueReadBuffer(src, CL_TRUE, 0, count * sizeof(T), dst);
+    //#ifdef DEDISP_DEBUG
+    cl_int error = stream.finish();
+    if (error != CL_SUCCESS) {
+        return false;
+    }
+    //#endif
 	return true;
 }
 #if 0
@@ -122,65 +103,99 @@ bool copy_device_to_symbol(/*const char**/U symbol, const T* src,
 // ------- REMOVED --------
 #endif
 // Note: Strides must be given in units of bytes
-template <typename T, typename U>
-bool copy_host_to_device_2d(T *dst, gpu_size_t dst_stride, const U *src,
-                            gpu_size_t src_stride, gpu_size_t width_bytes,
-                            gpu_size_t height, sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-        dpct::dpct_memcpy /*Async*/ (dst, dst_stride, //*sizeof(T),
-                                     src, src_stride, //*sizeof(U),
-                                     width_bytes, height,
-                                     dpct::host_to_device /*, stream*/);
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:3: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+template </*typename T, */typename U>
+bool copy_host_to_device_2d(cl::Buffer& dst, gpu_size_t dst_offset, gpu_size_t dst_stride,
+                            const U *src, gpu_size_t src_offset, gpu_size_t src_stride,
+                            gpu_size_t width_bytes, gpu_size_t height,
+                            const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    // TODO: Can't use Async versions unless host memory is pinned!
+    cl_int error = 
+    stream.enqueueWriteBufferRect(dst, /* blocking = */ CL_TRUE,
+                                  /* buffer_offset = */ {dst_offset, 0, 0},
+                                  /* host_offset = */ {src_stride, 0, 0},
+                                  /* region = */ {width_bytes, height, 1},
+                                  /* buffer_row_pitch = */ dst_stride,
+                                  /* buffer_slice_pitch = */ 0,
+                                  /* host_row_pitch = */ src_stride,
+                                  /* host_slice_pitch = */ 0,
+                                  src);
+    //#ifdef DEDISP_DEBUG
+    error |= stream.finish();
+    if (error != CL_SUCCESS) {
+        return false;
+    }
+    //#endif
 	return true;
 }
 
-template <typename T, typename U>
-bool copy_device_to_host_2d(T *dst, gpu_size_t dst_stride, const U *src,
-                            gpu_size_t src_stride, gpu_size_t width_bytes,
-                            gpu_size_t height, sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-        dpct::dpct_memcpy /*Async*/ (dst, dst_stride, src, src_stride,
-                                     width_bytes, height,
-                                     dpct::device_to_host /*, stream*/);
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:4: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
+template </*typename T, */typename U>
+bool copy_host_to_device_2d(cl::Buffer& dst, gpu_size_t dst_stride,
+                            const U *src, gpu_size_t src_stride,
+                            gpu_size_t width_bytes, gpu_size_t height,
+                            const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    return copy_host_to_device_2d(dst, 0, dst_stride, src, 0, src_stride, width_bytes, height, stream);
+}
 
-        //#endif
+template <typename T/*, typename U*/>
+bool copy_device_to_host_2d(T *dst, gpu_size_t dst_offset, gpu_size_t dst_stride,
+                            cl::Buffer& src, gpu_size_t src_offset, gpu_size_t src_stride,
+                            gpu_size_t width_bytes, gpu_size_t height,
+                            const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    // TODO: Can't use Async versions unless host memory is pinned!
+    cl_int error = 
+    stream.enqueueReadBufferRect(src, /* blocking = */ CL_TRUE,
+                                 /* buffer_offset = */ {src_offset, 0, 0},
+                                 /* host_offset = */ {dst_offset, 0, 0},
+                                 /* region = */ {width_bytes, height, 1},
+                                 /* buffer_row_pitch = */ src_stride,
+                                 /* buffer_slice_pitch = */ 0,
+                                 /* host_row_pitch = */ dst_stride,
+                                 /* host_slice_pitch = */ 0,
+                                 dst);
+    //#ifdef DEDISP_DEBUG
+    error |= stream.finish();
+    if (error != CL_SUCCESS) {
+        return false;
+    }
+    //#endif
 	return true;
 }
 
-template <typename T, typename U>
-bool copy_device_to_device_2d(T *dst, gpu_size_t dst_stride, const U *src,
-                              gpu_size_t src_stride, gpu_size_t width_bytes,
-                              gpu_size_t height, sycl::queue *stream = 0) {
-        dpct::dpct_memcpy /*Async*/ (dst, dst_stride, src, src_stride,
-                                     width_bytes, height,
-                                     dpct::device_to_device /*, stream*/);
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:5: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
+template <typename T/*, typename U*/>
+bool copy_device_to_host_2d(T *dst, gpu_size_t dst_stride,
+                            cl::Buffer& src, gpu_size_t src_stride,
+                            gpu_size_t width_bytes, gpu_size_t height,
+                            const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    return copy_device_to_host_2d(dst, 0, dst_stride, src, 0, src_stride, width_bytes, height, stream);
+}
 
-        //#endif
+/*template <typename T, typename U>*/
+bool copy_device_to_device_2d(cl::Buffer& dst, gpu_size_t dst_offset, gpu_size_t dst_stride,
+                              cl::Buffer& src, gpu_size_t src_offset, gpu_size_t src_stride,
+                              gpu_size_t width_bytes, gpu_size_t height,
+                              const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    cl_int error = 
+    stream.enqueueCopyBufferRect(src, dst,
+                                 /* src_origin = */ {src_offset, 0, 0},
+                                 /* dst_origin = */ {dst_offset, 0, 0},
+                                 /* region = */ {width_bytes, height, 1},
+                                 /* src_row_pitch = */ src_stride,
+                                 /* src_slice_pitch = */ 0,
+                                 /* dst_row_pitch = */ dst_stride,
+                                 /* dst_slice_pitch = */ 0);
+    //#ifdef DEDISP_DEBUG
+    error |= stream.finish();
+    if (error != CL_SUCCESS) {
+        return false;
+    }
+    //#endif
 	return true;
+}
+
+/*template <typename T, typename U>*/
+bool copy_device_to_device_2d(cl::Buffer& dst, gpu_size_t dst_stride,
+                              cl::Buffer& src, gpu_size_t src_stride,
+                              gpu_size_t width_bytes, gpu_size_t height,
+                              const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    return copy_device_to_device_2d(dst, 0, dst_stride, src, 0, src_stride, width_bytes, height, stream);
 }

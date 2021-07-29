@@ -13,7 +13,7 @@ OPTIMISE  := -O3
 # Note: Using -G makes the GPU kernel 16x slower!
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
-INCLUDE   := -I$(SRC_DIR) -I$(THRUST_DIR)
+INCLUDE   := -I$(SRC_DIR) -I$(CL_INCLUDE_DIR)
 # LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
 LIB       := -lstdc++
 
@@ -22,7 +22,8 @@ HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
-CPP_FLAGS := -g
+CL_SOURCES := $(SRC_DIR)/transpose.cl
+CL_XXD_FILES := $(patsubst $(SRC_DIR)/%.cl, $(SRC_DIR)/%.cl.xxd.txt, $(CL_SOURCES))
 
 LIB_NAME  := libdedisp
 SO_EXT    := .so
@@ -32,7 +33,7 @@ MINOR     := 0.1
 SO_FILE   := $(LIB_NAME)$(SO_EXT).$(MAJOR).$(MINOR)
 SO_NAME   := $(LIB_DIR)/$(SO_FILE)
 A_NAME    := $(LIB_DIR)/$(LIB_NAME)$(A_EXT)
-LD_FLAGS  := -shared -fPIC -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR)
+LD_FLAGS  := -shared -fPIC -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -lOpenCL
 
 # PTX_NAME  := ./dedisp_kernels.ptx
 
@@ -41,15 +42,18 @@ all: shared
 #$(ECHO) Building shared library $(SO_FILE)
 shared: $(SO_NAME)
 
-$(SO_NAME): $(SOURCES) $(HEADERS)
+$(SO_NAME): $(SOURCES) $(HEADERS) $(CL_XXD_FILES)
 	mkdir -p $(INCLUDE_DIR)
 	mkdir -p $(LIB_DIR)
 	mkdir -p $(OBJ_DIR)
-	$(DPCPP) $(LD_FLAGS) $(CPP_FLAGS) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
+	$(CLCC) -std=$(CXX_STD) $(LD_FLAGS) $(OPTIMISE) $(DEBUG) $(INCLUDE) -o $(SO_NAME) $(SOURCES) $(LIB)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT).$(MAJOR)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT)
 	cp $(INTERFACE) $(INCLUDE_DIR)
 	cp $(CPP_INTERFACE) $(INCLUDE_DIR)
+
+$(SRC_DIR)/%.cl.xxd.txt: $(SRC_DIR)/%.cl
+	xxd -i < $< > $@ && echo ', 0' >> $@
 
 #static: $(A_NAME)
 
@@ -71,7 +75,7 @@ doc: $(SRC_DIR)/dedisp.h Doxyfile
 	$(DOXYGEN) Doxyfile
 
 clean:
-	$(RM) -f $(SO_NAME) $(A_NAME) $(OBJ_DIR)/*.o $(LIB_DIR)/*.so $(LIB_DIR)/*.so.1
+	$(RM) -f $(SO_NAME) $(A_NAME) $(OBJ_DIR)/*.o $(LIB_DIR)/*.so $(LIB_DIR)/*.so.1 $(SRC_DIR)/*.cl.xxd.txt
 
 install: all
 	cp $(INTERFACE) $(INSTALL_DIR)/include/
