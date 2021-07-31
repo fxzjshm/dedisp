@@ -21,9 +21,8 @@
 
 #pragma once
 
-#include <CL/opencl.hpp>
 #include <boost/compute.hpp>
-using namespace cl;
+namespace bc = boost::compute;
 
 #include <vector> // For generate_dm_list
 #include <cmath>
@@ -85,18 +84,18 @@ char dedisperse_kernel_src[] = {
 #include "dedisperse.cl.xxd.txt"
 };
 
-bool dedisperse(cl::Buffer       d_in,
+bool dedisperse(bc::buffer       d_in,
                 dedisp_size      d_in_offset,
                 dedisp_size      in_stride,
                 dedisp_size      nsamps,
                 dedisp_size      in_nbits,
                 dedisp_size      nchans,
                 dedisp_size      chan_stride,
-                const cl::Buffer d_dm_list,
+                const bc::buffer d_dm_list,
                 dedisp_size      d_dm_list_offset,
                 dedisp_size      dm_count,
                 dedisp_size      dm_stride,
-                cl::Buffer       d_out,
+                bc::buffer       d_out,
                 dedisp_size      d_out_offset,
                 dedisp_size      out_stride,
                 dedisp_size      out_nbits,
@@ -120,7 +119,7 @@ bool dedisperse(cl::Buffer       d_in,
 	
 	// Define thread decomposition
 	// Note: Block dimensions x and y represent time samples and DMs respectively
-    cl::NDRange block(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
+    bc::extents<3> block = {BLOCK_DIM_X, BLOCK_DIM_Y, 1};
     // Note: Grid dimension x represents time samples. Dimension y represents
 	//         DMs and batch jobs flattened together.
 	
@@ -136,22 +135,21 @@ bool dedisperse(cl::Buffer       d_in,
                           (unsigned int)(MAX_CUDA_GRID_SIZE_Y / batch_size));
 
     // Note: We combine the DM and batch dimensions into one
-    cl::NDRange grid(nsamp_blocks, ndm_blocks * batch_size, 1);
+    bc::extents<3> grid = {nsamp_blocks, ndm_blocks * batch_size, 1};
 
     // Divide and round up
 	dedisp_size nsamps_reduced = (nsamps - 1) / DEDISP_SAMPS_PER_THREAD + 1;
 
-    cl::CommandQueue stream = dedisp::device_manager::instance().current_device().default_queue();
+    bc::command_queue stream = bc::system::default_queue();
 
-    cl::Context context = dedisp::device_manager::instance().current_context();
-    cl::Buffer d_c_delay_table(context, CL_MEM_COPY_HOST_PTR, (size_t)DEDISP_MAX_NCHANS, c_delay_table);
-    cl::Buffer d_c_killmask(context, CL_MEM_COPY_HOST_PTR, (size_t)DEDISP_MAX_NCHANS, c_killmask);
+    bc::context context = bc::system::default_context();
+    bc::buffer d_c_delay_table(context, (size_t)DEDISP_MAX_NCHANS, CL_MEM_COPY_HOST_PTR, c_delay_table);
+    bc::buffer d_c_killmask(context, (size_t)DEDISP_MAX_NCHANS, CL_MEM_COPY_HOST_PTR, c_killmask);
 
     // Execute the kernel
-    auto DEDISP_CALL_KERNEL = [=](int NBITS) {
+    auto DEDISP_CALL_KERNEL = [&](int NBITS) {
         cl_int error;
-        cl::Program program(dedisp::device_manager::instance().current_context(),
-                            dedisperse_kernel_src, /* build = */ false);
+        bc::program program = bc::program::create_with_source(dedisperse_kernel_src, bc::system::default_context());
         std::string build_arguments = dedisp::type_define_arguments;
 // macros need to be defined when compile:
 //     DEDISP_WORD_TYPE, DEDISP_SIZE_TYPE, DEDISP_FLOAT_TYPE, DEDISP_BYTE_TYPE, DEDISP_BOOL_TYPE
@@ -160,16 +158,14 @@ bool dedisperse(cl::Buffer       d_in,
         build_arguments += std::string("-DSAMPS_PER_THREAD=") + std::to_string(DEDISP_SAMPS_PER_THREAD) + " ";
         build_arguments += std::string("-DBLOCK_DIM_X=") + std::to_string(BLOCK_DIM_X) + " ";
         build_arguments += std::string("-DBLOCK_DIM_Y=") + std::to_string(BLOCK_DIM_Y) + " ";
-        error = program.build(build_arguments.c_str());
-        if (error != CL_SUCCESS) {
+        try {
+            program.build(build_arguments.c_str());
+        } catch(bc::opencl_error error) {
             std::cerr << "Build OpenCL source fail at" << __FILE__ << ":" << __LINE__ << std::endl;
-            auto build_logs = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
-            for (auto pair : build_logs) {
-                std::cerr << "Build log of device" << pair.first.getInfo<CL_DEVICE_NAME>() << "is: " << std::endl
-                          << pair.second << std::endl;
-            }
+            std::cerr << "Build log is: " << std::endl
+                      << program.build_log() << std::endl;
         }
-        cl::Kernel kernel(program, "dedisperse_kernel", &error);
+        bc::kernel kernel = program.create_kernel("dedisperse_kernel");
 
         /*
 __kernel void dedisperse_kernel(
@@ -197,33 +193,34 @@ __kernel void dedisperse_kernel(
             __constant dedisp_float*       c_delay_table,
             __constant dedisp_bool*        c_killmask);
         */
-        kernel.setArg(0, d_in);
-        kernel.setArg(1, d_in_offset);
-        kernel.setArg(2, nsamps);
-        kernel.setArg(3, nsamps_reduced);
-        kernel.setArg(4, nsamp_blocks);
-        kernel.setArg(5, in_stride);
-        kernel.setArg(6, dm_count);
-        kernel.setArg(7, dm_stride);
-        kernel.setArg(8, ndm_blocks);
-        kernel.setArg(9, nchans);
-        kernel.setArg(10, chan_stride);
-        kernel.setArg(11, d_out);
-        kernel.setArg(12, d_out_offset);
-        kernel.setArg(13, out_nbits);
-        kernel.setArg(14, out_stride);
-        kernel.setArg(15, d_dm_list);
-        kernel.setArg(16, d_dm_list_offset);
-        kernel.setArg(17, batch_in_stride);
-        kernel.setArg(18, batch_dm_stride);
-        kernel.setArg(19, batch_chan_stride);
-        kernel.setArg(20, batch_out_stride);
-        kernel.setArg(21, d_c_delay_table);
-        kernel.setArg(22, d_c_killmask);
-        cl::NDRange global_size(grid[0] * block[0], grid[1] * block[1], grid[2] * block[2]);
-        error = stream.enqueueNDRangeKernel(kernel, cl::NullRange, global_size, block);
+        kernel.set_arg(0, d_in);
+        kernel.set_arg(1, d_in_offset);
+        kernel.set_arg(2, nsamps);
+        kernel.set_arg(3, nsamps_reduced);
+        kernel.set_arg(4, nsamp_blocks);
+        kernel.set_arg(5, in_stride);
+        kernel.set_arg(6, dm_count);
+        kernel.set_arg(7, dm_stride);
+        kernel.set_arg(8, ndm_blocks);
+        kernel.set_arg(9, nchans);
+        kernel.set_arg(10, chan_stride);
+        kernel.set_arg(11, d_out);
+        kernel.set_arg(12, d_out_offset);
+        kernel.set_arg(13, out_nbits);
+        kernel.set_arg(14, out_stride);
+        kernel.set_arg(15, d_dm_list);
+        kernel.set_arg(16, d_dm_list_offset);
+        kernel.set_arg(17, batch_in_stride);
+        kernel.set_arg(18, batch_dm_stride);
+        kernel.set_arg(19, batch_chan_stride);
+        kernel.set_arg(20, batch_out_stride);
+        kernel.set_arg(21, d_c_delay_table);
+        kernel.set_arg(22, d_c_killmask);
+
+        bc::extents<3> global_size = bc::dim(grid[0] * block[0], grid[1] * block[1], grid[2] * block[2]);
+        stream.enqueue_nd_range_kernel(kernel, 3, nullptr, global_size.data(), block.data());
     };
-	// Note: Here we dispatch dynamically on nbits for supported values
+    // Note: Here we dispatch dynamically on nbits for supported values
     switch( in_nbits ) {
         case 1:  DEDISP_CALL_KERNEL(1);  break;
         case 2:  DEDISP_CALL_KERNEL(2);  break;
@@ -233,18 +230,10 @@ __kernel void dedisperse_kernel(
         case 32: DEDISP_CALL_KERNEL(32); break;
         default: /* should never be reached */ break;
     }
-
-#undef DEDISP_CALL_KERNEL
-		
-	// Check for kernel errors
 #ifdef DEDISP_DEBUG
-	cl_int error = stream.finish();
-	if( error != CL_SUCCESS ) {
-		return false;
-	}
-#endif // DEDISP_DEBUG
-	
-	return true;
+    stream.finish();  
+#endif
+    return true;
 }
 
 const char scrunch_x2_src[] = {
@@ -252,28 +241,28 @@ const char scrunch_x2_src[] = {
 };
 
 // Reduces the time resolution by 2x
-dedisp_error scrunch_x2(cl::Buffer  d_in, dedisp_size d_in_offset,
+dedisp_error scrunch_x2(bc::buffer  d_in, dedisp_size d_in_offset,
                         dedisp_size nsamps,
                         dedisp_size nchan_words,
                         dedisp_size nbits,
-                        cl::Buffer  d_out, dedisp_size d_out_offset)
+                        bc::buffer  d_out, dedisp_size d_out_offset)
 {
     dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 
-    cl::Program program(dedisp::device_manager::instance().current_context(), scrunch_x2_src);
+    bc::program program = bc::program::create_with_source(scrunch_x2_src, bc::system::default_context());
     std::string build_arguments = dedisp::type_define_arguments;
     program.build(build_arguments.c_str());
-    cl::Kernel kernel(program, "scrunch_x2_kernel");
+    bc::kernel kernel = program.create_kernel("scrunch_x2_kernel");
     /* __kernel void scrunch_x2_kernel(__global WordType* in, dedisp_size in_offset __global dedisp_word* outs, dedisp_size out_offset, int nbits, unsigned int in_nsamps); */
-    kernel.setArg(0, d_in);
-    kernel.setArg(1, d_in_offset);
-    kernel.setArg(2, d_out);
-    kernel.setArg(3, d_out_offset);
-    kernel.setArg(4, (cl_int) nbits);
-    kernel.setArg(5, (cl_uint) nsamps);
-    cl::CommandQueue queue = dedisp::device_manager::instance().current_queue();
-    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(out_count));
+    kernel.set_arg(0, d_in);
+    kernel.set_arg(1, d_in_offset);
+    kernel.set_arg(2, d_out);
+    kernel.set_arg(3, d_out_offset);
+    kernel.set_arg(4, (cl_int) nbits);
+    kernel.set_arg(5, (cl_uint) nsamps);
+    bc::command_queue queue = bc::system::default_queue();
+    queue.enqueue_1d_range_kernel(kernel, 0, out_count, 0);
     queue.finish();
 
     return DEDISP_NO_ERROR;
@@ -334,27 +323,27 @@ char unpack_kernel_src[] = {
 #include "unpack.cl.xxd.txt"
 };
 
-dedisp_error unpack(cl::Buffer d_transposed,
+dedisp_error unpack(bc::buffer d_transposed,
                     dedisp_size nsamps, dedisp_size nchan_words,
-                    cl::Buffer d_unpacked,
+                    bc::buffer d_unpacked,
                     dedisp_size in_nbits, dedisp_size out_nbits)
 {
     dedisp_size expansion = out_nbits / in_nbits;
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 
-    cl::Program program(dedisp::device_manager::instance().current_context(), unpack_kernel_src);
-    string build_arguments = dedisp::type_define_arguments;
+    bc::program program = bc::program::create_with_source(unpack_kernel_src, bc::system::default_context());
+    std::string build_arguments = dedisp::type_define_arguments;
     program.build(build_arguments.c_str());
-    cl::Kernel kernel(program, "unpack_kernel");
+    bc::kernel kernel = program.create_kernel("unpack_kernel");
     /* __kernel void unpack_kernel(__global WordType* in, __global dedisp_word* out, int nsamps, int in_nbits, int out_nbits); */
-    kernel.setArg(0, d_transposed);
-    kernel.setArg(1, d_unpacked);
-    kernel.setArg(2, (cl_int) nsamps);
-    kernel.setArg(3, (cl_int) in_nbits);
-    kernel.setArg(4, (cl_int) out_nbits);
-    cl::CommandQueue queue = dedisp::device_manager::instance().current_queue();
-    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(out_count));
+    kernel.set_arg(0, d_transposed);
+    kernel.set_arg(1, d_unpacked);
+    kernel.set_arg(2, (cl_int) nsamps);
+    kernel.set_arg(3, (cl_int) in_nbits);
+    kernel.set_arg(4, (cl_int) out_nbits);
+    bc::command_queue queue = bc::system::default_queue();
+    queue.enqueue_1d_range_kernel(kernel, 0, out_count, 0);
     queue.finish();
 
     return DEDISP_NO_ERROR;

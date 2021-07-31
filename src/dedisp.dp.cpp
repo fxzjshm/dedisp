@@ -24,9 +24,8 @@
 //#define DEDISP_DEBUG
 //#define DEDISP_BENCHMARK
 
-// #define CL_HPP_CL_1_2_DEFAULT_BUILD
-#define CL_HPP_MINIMUM_OPENCL_VERSION 100
-#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_MINIMUM_OPENCL_VERSION 100
+#define CL_TARGET_OPENCL_VERSION 120
 
 #include <dedisp.h>
 
@@ -35,8 +34,8 @@
 #include <cmath>
 #include <cstdlib>
 
-#include <CL/opencl.hpp>
-using namespace cl;
+#include <boost/compute.hpp>
+namespace bc = boost::compute;
 
 #ifdef DEDISP_BENCHMARK
 #include <fstream>
@@ -156,7 +155,9 @@ dedisp_error update_scrunch_list(dedisp_plan plan) {
 	if( error != DEDISP_NO_ERROR ) {
 		return error;
 	}
-	
+
+    boost::compute::command_queue queue = bc::system::default_queue();
+
 	// Allocate on and copy to the device
 	try {
 		plan->d_scrunch_list.resize(plan->dm_count);
@@ -186,10 +187,7 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
 	// Initialise to NULL for safety
 	*plan_ = 0;
 
-	
-	int device_idx = dedisp::device_manager::instance().current_device_id();
-
-        // Check for parameter errors
+    // Check for parameter errors
 	if( nchans > DEDISP_MAX_NCHANS ) {
 		throw_error(DEDISP_NCHANS_EXCEEDS_LIMIT);
 	}
@@ -212,12 +210,14 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
 	plan->df            = df;
 	//plan->stream        = 0;
 	
+	/*
 	// constrct buffers on correct context
-	boost::compute::context context(dedisp::device_manager::instance().current_context().get());
+	boost::compute::context context(bc::system::default_context().get());
 	plan->d_delay_table = boost::compute::vector<dedisp_float>(context);
 	plan->d_dm_list = boost::compute::vector<dedisp_float>(context);
 	plan->d_killmask = boost::compute::vector<dedisp_bool>(context);
 	plan->d_scrunch_list = boost::compute::vector<dedisp_size>(context);
+    */
 
 	// Generate delay table and copy to device memory
 	// Note: The DM factor is left out and applied during dedispersion
@@ -353,18 +353,22 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
 }
 
 dedisp_error dedisp_set_device(int device_idx) {
-    int error = dedisp::device_manager::instance().select_device(device_idx);
-    string device_name = dedisp::device_manager::instance().current_device().unwrap().getInfo<CL_DEVICE_NAME>();
+    std::string device_name = bc::system::devices()[device_idx].get_info<CL_DEVICE_NAME>();
     setenv("BOOST_COMPUTE_DEFAULT_DEVICE", device_name.c_str(), /* __replace = */ true);
+	setenv("BOOST_COMPUTE_DEFAULT_ENFORCE", "1", /* __replace = */ true);
+	std::cout << boost::compute::system::default_device().get_info<CL_DEVICE_NAME>() << std::endl;
+	try {
+        assert(boost::compute::system::default_device().get_info<CL_DEVICE_NAME>() == device_name);
+	} catch(bc::no_device_found exception) {
+		throw_error(DEDISP_INVALID_DEVICE_INDEX);
+	} catch(...) {
+		throw_error(DEDISP_UNKNOWN_ERROR);
+	}
+	
 #if defined(DEDISP_DEBUG) && DEDISP_DEBUG
     printf("Currently using device %s\n", device_name.c_str());
 #endif
-    if (CL_INVALID_ARG_VALUE == error)
-            throw_error(DEDISP_INVALID_DEVICE_INDEX);
-    else if (CL_SUCCESS != error)
-            throw_error(DEDISP_UNKNOWN_ERROR);
-	else
-		return DEDISP_NO_ERROR;
+    return DEDISP_NO_ERROR;
 }
 
 dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
@@ -382,7 +386,7 @@ dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 	else {
 		// Set the killmask to all true
 		std::fill(plan->killmask.begin(), plan->killmask.end(), (dedisp_bool)true);
-        boost::compute::command_queue queue_bc = dedisp::device_manager::instance().current_queue_bc();
+        boost::compute::command_queue queue_bc = bc::system::default_queue();
         boost::compute::fill(plan->d_killmask.begin(), plan->d_killmask.end(),
                              (dedisp_bool)true, queue_bc);
     }
@@ -508,22 +512,24 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	// Copy the lookup tables to constant memory on the device
 	// TODO: This was much tidier, but thanks to CUDA's insistence on
 	//         breaking its API in v5.0 I had to mess it up like this.
-	cl::Context	context = dedisp::device_manager::instance().current_context();
-	cl::CommandQueue queue = dedisp::device_manager::instance().current_queue();
-	cl_int error = queue.enqueueWriteBuffer(cl::Buffer(plan->d_delay_table.get_buffer().get()), true, 0,
-											plan->nchans * sizeof(dedisp_float),
-											c_delay_table);
-	if( error != CL_SUCCESS ) {
-		throw_error(DEDISP_MEM_COPY_FAILED);
-	}
-    error = queue.enqueueWriteBuffer(cl::Buffer(plan->d_killmask.get_buffer().get()), true, 0,
-											plan->nchans * sizeof(dedisp_float),
-											c_killmask);
-	if( error != CL_SUCCESS ) {
-		throw_error(DEDISP_MEM_COPY_FAILED);
-	}
+    bc::context    context = bc::system::default_context();
+    bc::command_queue queue = bc::system::default_queue();
+    try {
+        queue.enqueue_write_buffer(plan->d_delay_table.get_buffer(), 0,
+                                   plan->nchans * sizeof(dedisp_float),
+                                   c_delay_table);
+    } catch(...) {
+        throw_error(DEDISP_MEM_COPY_FAILED);
+    }
+    try {
+        queue.enqueue_write_buffer(plan->d_killmask.get_buffer(), 0,
+                                   plan->nchans * sizeof(dedisp_float),
+                                   c_killmask);
+    } catch(...) {
+        throw_error(DEDISP_MEM_COPY_FAILED);
+    }
 
-        // Compute the problem decomposition
+    // Compute the problem decomposition
 	dedisp_size nsamps_computed = nsamps - plan->max_delay;
 	// Specify the maximum gulp size
 	dedisp_size nsamps_computed_gulp_max;
@@ -584,10 +590,10 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	
 	// Organise device memory pointers
 	// -------------------------------
-	cl::Buffer d_in;
-	cl::Buffer d_transposed;
-	cl::Buffer d_unpacked;
-	cl::Buffer d_out;
+    bc::buffer d_in;
+    bc::buffer d_transposed;
+    bc::buffer d_unpacked;
+    bc::buffer d_out;
     boost::compute::vector<dedisp_word> d_in_buf;
     boost::compute::vector<dedisp_word> d_transposed_buf;
     boost::compute::vector<dedisp_word> d_unpacked_buf;
@@ -597,33 +603,33 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		/*
 		try { d_in_buf.resize(in_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-        d_in = cl::Buffer(d_in_buf.get_buffer().get());
+        d_in = bc::buffer(d_in_buf.get_buffer().get());
 		*/
-	    d_in = cl::Buffer(context, CL_MEM_USE_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), const_cast<dedisp_byte *>(in));
+        d_in = bc::buffer(context, in_count_gulp_max * sizeof(dedisp_word), CL_MEM_USE_HOST_PTR, const_cast<dedisp_byte *>(in));
     }
 	else {
-		d_in = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), const_cast<dedisp_byte *>(in));
+        d_in = bc::buffer(context, in_count_gulp_max * sizeof(dedisp_word), CL_MEM_COPY_HOST_PTR, const_cast<dedisp_byte *>(in));
 	}
 	if( using_host_memory ) {
 		/*
 		try { d_out_buf.resize(out_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-        d_out = cl::Buffer(d_out_buf.get_buffer().get());
+        d_out = bc::buffer(d_out_buf.get_buffer().get());
 		*/
-	    d_out = cl::Buffer(context, CL_MEM_USE_HOST_PTR, out_count_gulp_max * sizeof(dedisp_word), out);
+        d_out = bc::buffer(context, out_count_gulp_max * sizeof(dedisp_word), CL_MEM_USE_HOST_PTR, out);
     }
 	else {
-		d_out = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, out_count_gulp_max * sizeof(dedisp_word), out);
+        d_out = bc::buffer(context, out_count_gulp_max * sizeof(dedisp_word), CL_MEM_COPY_HOST_PTR, out);
 	}
 	//// Note: * 2 here is for the time-scrunched copies of the data
 	try { d_transposed_buf.resize(in_count_padded_gulp_max/* * 2 */); }
 	catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-    d_transposed = cl::Buffer(d_transposed_buf.get_buffer().get());
+    d_transposed = bc::buffer(d_transposed_buf.get_buffer().get());
 
     // Note: * 2 here is for the time-scrunched copies of the data
 	try { d_unpacked_buf.resize(unpacked_count_padded_gulp_max * 2); }
 	catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-    d_unpacked = cl::Buffer(d_unpacked_buf.get_buffer().get());
+    d_unpacked = bc::buffer(d_unpacked_buf.get_buffer().get());
     // -------------------------------
 	
 	// The stride (in words) between differently-scrunched copies of the
@@ -649,7 +655,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif //  USE_SUBBAND_ALGORITHM
 	
 	// TODO: Eventually re-implement streams
-    // cl::CommandQueue queue = dedisp::device_manager::instance().current_queue(); //(cudaStream_t)plan->stream;
+    // bc::command_queue queue = bc::system::default_queue(); //(cudaStream_t)plan->stream;
 
 #ifdef DEDISP_BENCHMARK
 	Stopwatch copy_to_timer;
@@ -845,7 +851,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                               boost::compute::make_constant_iterator(cur_scrunch),
                                               d_scrunched_dm_list.begin(),
                                               boost::compute::divides<dedisp_float>());
-                    cl::Buffer d_scrunched_dm_list_ptr = dedisp::convert(d_scrunched_dm_list.get_buffer());
+                    bc::buffer d_scrunched_dm_list_ptr = d_scrunched_dm_list.get_buffer();
 
                     // TODO: Is this how the nsamps vars need to change?
 					if( !dedisperse(//&d_transposed[scrunch_offset],
@@ -878,7 +884,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                 unpacked_in_nbits, // in_nbits,
                                 plan->nchans,
                                 1,
-                                dedisp::convert(plan->d_dm_list.get_buffer()), first_dm_idx,
+                                plan->d_dm_list.get_buffer(), first_dm_idx,
                                 dm_count,
                                 1,
                                 d_out, 0,
@@ -911,7 +917,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 						dedisp_size scrunch_count = s+1 - scrunch_start;
 						
 						dedisp_size  src_stride = out_stride_gulp_bytes;
-						cl::Buffer src = d_out; // offset = + scrunch_start * src_stride
+						bc::buffer src = d_out; // offset = + scrunch_start * src_stride
 						dedisp_byte* dst = (out + scrunch_start * out_stride
 						                    + gulp_samp_byte_idx / cur_scrunch);
 						dedisp_size  width = nsamp_bytes_computed_gulp / cur_scrunch;
@@ -1017,10 +1023,12 @@ dedisp_error dedisp_execute(const dedisp_plan  plan,
 
 dedisp_error dedisp_sync(void)
 {
-    if (dedisp::device_manager::instance().current_queue().finish() != CL_SUCCESS)
-        throw_error(DEDISP_PRIOR_GPU_ERROR);
-	else
-		return DEDISP_NO_ERROR;
+    try {
+        bc::system::default_queue().finish();
+        return DEDISP_NO_ERROR;
+    } catch(...) {
+        return DEDISP_PRIOR_GPU_ERROR;
+    }
 }
 
 void dedisp_destroy_plan(dedisp_plan plan)

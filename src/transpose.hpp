@@ -23,8 +23,8 @@
 
 #pragma once
 
-#include <CL/opencl.hpp>
-using namespace cl;
+#include <boost/compute.hpp>
+namespace bc = boost::compute;
 #include "utils.dp.hpp"
 #include <iostream>
 #include <limits>
@@ -47,11 +47,11 @@ struct Transpose {
 	
 	Transpose() {}
 
-    void transpose(cl::Buffer& in, size_t width, size_t height,
-                   size_t in_stride, size_t out_stride, cl::Buffer& out,
-                   const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue());
-    void transpose(cl::Buffer& in, size_t width, size_t height, cl::Buffer& out,
-                   const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+    void transpose(bc::buffer& in, size_t width, size_t height,
+                   size_t in_stride, size_t out_stride, bc::buffer& out,
+                   bc::command_queue& stream = bc::system::default_queue());
+    void transpose(bc::buffer& in, size_t width, size_t height, bc::buffer& out,
+                   bc::command_queue& stream = bc::system::default_queue()) {
             transpose(in, width, height, width, height, out, stream);
 	}
 private:
@@ -103,11 +103,11 @@ char transpose_kernel_src[] = {
 
 
 template <typename T>
-void Transpose<T>::transpose(cl::Buffer& in,
+void Transpose<T>::transpose(bc::buffer& in,
                size_t width, size_t height,
                size_t in_stride, size_t out_stride,
-               cl::Buffer& out,
-               const cl::CommandQueue& stream)
+               bc::buffer& out,
+               bc::command_queue& stream)
 {
 	// Parameter checks
 	// TODO: Implement some sort of error returning!
@@ -121,7 +121,7 @@ void Transpose<T>::transpose(cl::Buffer& in,
 
     
 	// Specify thread decomposition (uses up-rounded divisions)
-    cl::NDRange tot_block_count((width - 1) / TILE_DIM + 1,
+    bc::extents<3> tot_block_count = bc::dim((width - 1) / TILE_DIM + 1,
                                 (height - 1) / TILE_DIM + 1, 1);
 
     size_t max_grid_dim = round_down_pow2((size_t)cuda_specs::MAX_GRID_DIMENSION);
@@ -153,33 +153,28 @@ void Transpose<T>::transpose(cl::Buffer& in,
         	size_t w = min(max_grid_dim*TILE_DIM, width-x_offset);
         	size_t h = min(max_grid_dim*TILE_DIM, height-y_offset);
         
-            cl::NDRange block(TILE_DIM, BLOCK_ROWS, 1);
+            bc::extents<3> block = bc::dim(TILE_DIM, BLOCK_ROWS, 1);
 
             // TODO: Unfortunately there are cases where rounding to a power of 2 becomes
 			//       detrimental to performance. Could work out a heuristic.
 			//bool round_grid_to_pow2 = false;
 			bool round_grid_to_pow2 = true;
 			
-            auto call_transpose_kernel = [=](bool GRID_IS_POW2, cl::NDRange grid, cl::NDRange block) {
-                cl_int error;
-                cl::Program program(dedisp::device_manager::instance().current_context(),
-                                    transpose_kernel_src, /* build = */ false);
+            auto call_transpose_kernel = [&](bool GRID_IS_POW2, bc::extents<3> grid, bc::extents<3> block) {
+                bc::program program = bc::program::create_with_source(transpose_kernel_src, bc::system::default_context());
                 std::string build_arguments;
                 build_arguments += std::string("-DT_TYPE=") + dedisp::get_cl_typename<T>() + " ";
                 build_arguments += std::string("-DTILE_DIM=") + std::to_string(TILE_DIM) + " ";
                 build_arguments += std::string("-DBLOCK_ROWS=") + std::to_string(BLOCK_ROWS) + " ";
                 build_arguments += std::string("-DGRID_IS_POW2=") + std::to_string(int(GRID_IS_POW2)) + " ";
-                error = program.build(build_arguments.c_str());
-                if (error != CL_SUCCESS) {
+                try {
+                    program.build(build_arguments.c_str());
+                } catch(...) {
                     std::cerr << "Build OpenCL source fail at" << __FILE__ << ":" << __LINE__ << std::endl;
-                    auto build_logs = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
-                    for (auto pair : build_logs) {
-                        std::cerr << "Build log of device" << pair.first.getInfo<CL_DEVICE_NAME>() << "is: " << std::endl
-                                  << pair.second << std::endl;
-                    }
-                    
+                    std::cerr << "Build log is: " << std::endl
+                              << program.build_log() << std::endl;
                 }
-                cl::Kernel kernel(program, "transpose_kernel", &error);
+                bc::kernel kernel = program.create_kernel("transpose_kernel");
                 /*
                  * transpose_kernel(__global const T* in, gpu_size_t in_offset,
                  *                  gpu_size_t width, gpu_size_t height,
@@ -189,43 +184,36 @@ void Transpose<T>::transpose(cl::Buffer& in,
                  *                  gpu_size_t block_count_y,
                  *                  gpu_size_t log2_gridDim_y);
                  */
-                kernel.setArg(0, in);
-                kernel.setArg(1, (gpu_size_t) in_offset);
-                kernel.setArg(2, (gpu_size_t) width);
-                kernel.setArg(3, (gpu_size_t) height);
-                kernel.setArg(4, (gpu_size_t) in_stride);
-                kernel.setArg(5, (gpu_size_t) out_stride);
-                kernel.setArg(6, out);
-                kernel.setArg(7, (gpu_size_t) out_offset);
-                kernel.setArg(8, (gpu_size_t) block_count[0]);
-                kernel.setArg(9, (gpu_size_t) block_count[1]);
-                kernel.setArg(10, (gpu_size_t) log2(grid[1]));
-                cl::NDRange global_size(grid[0] * block[0], grid[1] * block[1], grid[2] * block[2]);
-                error = stream.enqueueNDRangeKernel(kernel, cl::NullRange, global_size, block);
+                kernel.set_arg(0, in);
+                kernel.set_arg(1, (gpu_size_t) in_offset);
+                kernel.set_arg(2, (gpu_size_t) width);
+                kernel.set_arg(3, (gpu_size_t) height);
+                kernel.set_arg(4, (gpu_size_t) in_stride);
+                kernel.set_arg(5, (gpu_size_t) out_stride);
+                kernel.set_arg(6, out);
+                kernel.set_arg(7, (gpu_size_t) out_offset);
+                kernel.set_arg(8, (gpu_size_t) block_count[0]);
+                kernel.set_arg(9, (gpu_size_t) block_count[1]);
+                kernel.set_arg(10, (gpu_size_t) log2(grid[1]));
+                bc::extents<3> global_size = bc::dim(grid[0] * block[0], grid[1] * block[1], grid[2] * block[2]);
+                
+                stream.enqueue_nd_range_kernel(kernel, 3, nullptr, global_size.data(), block.data());
             };
 
 			// Dispatch on grid-rounding
 			if( round_grid_to_pow2 ) {
-                cl::NDRange grid(round_up_pow2(block_count[0]),
-                                 round_up_pow2(block_count[1]), 1);
+                bc::extents<3> grid = bc::dim(round_up_pow2(block_count[0]), round_up_pow2(block_count[1]), 1);
                 // Run the CUDA kernel
                 call_transpose_kernel(true, grid, block);
             }
 			else {
-                cl::NDRange grid(block_count[0], block_count[1], 1);
+                bc::extents<3> grid = bc::dim(block_count[0], block_count[1], 1);
                 // Run the CUDA kernel
                 call_transpose_kernel(false, grid, block);
             }
 			
 #ifndef NDEBUG
-            cl_int error = stream.finish();
-			if( error != CL_SUCCESS ) {
-				/*
-				throw std::runtime_error(
-					std::string("Transpose: CUDA error in kernel: ") +
-					cudaGetErrorString(error));
-				*/
-			}
+            stream.finish();
 #endif
 		}
 	}
