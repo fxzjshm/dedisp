@@ -442,7 +442,7 @@ dedisp_float        dedisp_get_df(const dedisp_plan plan) {
 // Warning: Big mother function
 dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                  dedisp_size        nsamps,
-                                 dedisp_byte*       in,
+                                 const dedisp_byte* in,
                                  dedisp_size        in_nbits,
                                  dedisp_size        in_stride,
                                  dedisp_byte*       out,
@@ -599,10 +599,10 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
         d_in = cl::Buffer(d_in_buf.get_buffer().get());
 		*/
-	    d_in = cl::Buffer(context, CL_MEM_USE_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), in);
+	    d_in = cl::Buffer(context, CL_MEM_USE_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), const_cast<dedisp_byte *>(in));
     }
 	else {
-		d_in = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), in);
+		d_in = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), const_cast<dedisp_byte *>(in));
 	}
 	if( using_host_memory ) {
 		/*
@@ -844,7 +844,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                               plan->d_dm_list.begin() + dm_offset + scrunch_count,
                                               boost::compute::make_constant_iterator(cur_scrunch),
                                               d_scrunched_dm_list.begin(),
-                                              std::divides<dedisp_float>());
+                                              boost::compute::divides<dedisp_float>());
                     cl::Buffer d_scrunched_dm_list_ptr = dedisp::convert(d_scrunched_dm_list.get_buffer());
 
                     // TODO: Is this how the nsamps vars need to change?
