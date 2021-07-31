@@ -215,4 +215,11 @@ inline std::string get_cl_typename() {
 
 #undef MAKE_CL_BC_CONVERTER_2
 #undef MAKE_CL_BC_CONVERTER
+
+const std::string type_define_arguments = 
+    std::string(" -DDEDISP_WORD_TYPE=") + dedisp::get_cl_typename<dedisp_word>() + " " +
+    std::string(" -DDEDISP_SIZE_TYPE=") + dedisp::get_cl_typename<dedisp_size>() + " " +
+    std::string(" -DDEDISP_FLOAT_TYPE=") + dedisp::get_cl_typename<dedisp_float>() + " " +
+    std::string(" -DDEDISP_BYTE_TYPE=") + dedisp::get_cl_typename<dedisp_byte>() + " " +
+    std::string(" -DDEDISP_BOOL_TYPE=") + dedisp::get_cl_typename<dedisp_bool>() + " ";
 } // namespace dedisp

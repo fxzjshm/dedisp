@@ -152,15 +152,10 @@ bool dedisperse(cl::Buffer       d_in,
         cl_int error;
         cl::Program program(dedisp::device_manager::instance().current_context(),
                             dedisperse_kernel_src, /* build = */ false);
-        std::string build_arguments;
+        std::string build_arguments = dedisp::type_define_arguments;
 // macros need to be defined when compile:
 //     DEDISP_WORD_TYPE, DEDISP_SIZE_TYPE, DEDISP_FLOAT_TYPE, DEDISP_BYTE_TYPE, DEDISP_BOOL_TYPE
 //     int IN_NBITS, int SAMPS_PER_THREAD, int BLOCK_DIM_X, int BLOCK_DIM_Y
-        build_arguments += std::string("-DDEDISP_WORD_TYPE=") + dedisp::get_cl_typename<dedisp_word>() + " ";
-        build_arguments += std::string("-DDEDISP_SIZE_TYPE=") + dedisp::get_cl_typename<dedisp_size>() + " ";
-        build_arguments += std::string("-DDEDISP_FLOAT_TYPE=") + dedisp::get_cl_typename<dedisp_float>() + " ";
-        build_arguments += std::string("-DDEDISP_BYTE_TYPE=") + dedisp::get_cl_typename<dedisp_byte>() + " ";
-        build_arguments += std::string("-DDEDISP_BOOL_TYPE=") + dedisp::get_cl_typename<dedisp_bool>() + " ";
         build_arguments += std::string("-DIN_NBITS=") + std::to_string(NBITS) + " ";
         build_arguments += std::string("-DSAMPS_PER_THREAD=") + std::to_string(DEDISP_SAMPS_PER_THREAD) + " ";
         build_arguments += std::string("-DBLOCK_DIM_X=") + std::to_string(BLOCK_DIM_X) + " ";
@@ -252,38 +247,8 @@ __kernel void dedisperse_kernel(
 	return true;
 }
 
-
-template<typename WordType>
-struct scrunch_x2_functor : boost::compute::function<WordType (unsigned int)> {
-    boost::compute::buffer_iterator<WordType> in;
-	int             nbits;
-	WordType        mask;
-	unsigned int    in_nsamps;
-	unsigned int    out_nsamps;
-    scrunch_x2_functor(boost::compute::buffer_iterator<WordType> in_, int nbits_, unsigned int in_nsamps_)
-		: in(in_), nbits(nbits_), mask((1<<nbits)-1),
-		  in_nsamps(in_nsamps_), out_nsamps(in_nsamps_/2),
-          boost::compute::function<WordType (unsigned int)>("scrunch_x2_functor") {}
-	inline 
-	WordType operator()(unsigned int out_i) const {
-		unsigned int c     = out_i / out_nsamps;
-		unsigned int out_t = out_i % out_nsamps;
-		unsigned int in_t0 = out_t * 2;
-		unsigned int in_t1 = out_t * 2 + 1;
-		unsigned int in_i0 = c * in_nsamps + in_t0;
-		unsigned int in_i1 = c * in_nsamps + in_t1;
-		
-		dedisp_word in0 = in[in_i0];
-		dedisp_word in1 = in[in_i1];
-		dedisp_word out = 0;
-		for( int k=0; k<sizeof(WordType)*8; k+=nbits ) {
-			dedisp_word s0 = (in0 >> k) & mask;
-			dedisp_word s1 = (in1 >> k) & mask;
-			dedisp_word avg = ((unsigned long long)s0 + s1) / 2;
-			out |= avg << k;
-		}
-		return out;
-	}
+const char scrunch_x2_src[] = {
+#include "scrunch_x2.cl.xxd.txt"
 };
 
 // Reduces the time resolution by 2x
@@ -293,19 +258,23 @@ dedisp_error scrunch_x2(cl::Buffer  d_in, dedisp_size d_in_offset,
                         dedisp_size nbits,
                         cl::Buffer  d_out, dedisp_size d_out_offset)
 {
-
-    boost::compute::buffer_iterator<dedisp_word> d_in_begin(dedisp::convert(d_in), d_in_offset);
-    boost::compute::buffer_iterator<dedisp_word> d_out_begin(dedisp::convert(d_out), d_out_offset);
-
     dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 
-    using boost::compute::make_counting_iterator;
-
-    boost::compute::transform(make_counting_iterator<unsigned int>(0),
-                              make_counting_iterator<unsigned int>(out_count),
-                              d_out_begin,
-                              scrunch_x2_functor<dedisp_word>(d_in_begin, nbits, nsamps));
+    cl::Program program(dedisp::device_manager::instance().current_context(), scrunch_x2_src);
+    std::string build_arguments = dedisp::type_define_arguments;
+    program.build(build_arguments.c_str());
+    cl::Kernel kernel(program, "scrunch_x2_kernel");
+    /* __kernel void scrunch_x2_kernel(__global WordType* in, dedisp_size in_offset __global dedisp_word* outs, dedisp_size out_offset, int nbits, unsigned int in_nsamps); */
+    kernel.setArg(0, d_in);
+    kernel.setArg(1, d_in_offset);
+    kernel.setArg(2, d_out);
+    kernel.setArg(3, d_out_offset);
+    kernel.setArg(4, (cl_int) nbits);
+    kernel.setArg(5, (cl_uint) nsamps);
+    cl::CommandQueue queue = dedisp::device_manager::instance().current_queue();
+    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(out_count));
+    queue.finish();
 
     return DEDISP_NO_ERROR;
 }
@@ -361,59 +330,8 @@ dedisp_error generate_scrunch_list(dedisp_size* scrunch_list,
 	return DEDISP_NO_ERROR;
 }
 
-template<typename WordType>
-struct unpack_functor : boost::function<WordType (unsigned int)> {
-    boost::compute::buffer_iterator<WordType> in;
-	int             nsamps;
-	int             in_nbits;
-	int             out_nbits;
-    unpack_functor(boost::compute::buffer_iterator<WordType> in_, int nsamps_, int in_nbits_, int out_nbits_)
-		: in(in_), nsamps(nsamps_), in_nbits(in_nbits_), out_nbits(out_nbits_),
-          boost::compute::function<WordType (unsigned int)>("unpack_functor") {}
-	inline 
-	WordType operator()(unsigned int i) const {
-		int out_chans_per_word = sizeof(WordType)*8 / out_nbits;
-		int in_chans_per_word = sizeof(WordType)*8 / in_nbits;
-		//int expansion = out_nbits / in_nbits;
-		int norm = ((1l<<out_nbits)-1) / ((1l<<in_nbits)-1);
-		WordType in_mask  = (1<<in_nbits)-1;
-		WordType out_mask = (1<<out_nbits)-1;
-		
-		/*
-		  cw\k 0123 0123
-		  0    0123|0123
-		  1    4567|4567
-		  
-		  cw\k 0 1
-		  0    0 1 | 0 1
-		  1    2 3 | 2 3
-		  2    4 5 | 4 5
-		  3    6 7 | 6 7
-		  
-		  
-		 */
-		
-		unsigned int t      = i % nsamps;
-		// Find the channel word indices
-		unsigned int out_cw = i / nsamps;
-		//unsigned int in_cw  = out_cw / expansion;
-		//unsigned int in_i   = in_cw * nsamps + t;
-		//WordType word = in[in_i];
-		
-		WordType result = 0;
-		for( int k=0; k<sizeof(WordType)*8; k+=out_nbits ) {
-			
-			int c = out_cw * out_chans_per_word + k/out_nbits;
-			int in_cw = c / in_chans_per_word;
-			int in_k  = c % in_chans_per_word * in_nbits;
-			int in_i  = in_cw * nsamps + t;
-			WordType word = in[in_i];
-			
-			WordType val = (word >> in_k) & in_mask;
-			result |= ((val * norm) & out_mask) << k;
-		}
-		return result;
-	}
+char unpack_kernel_src[] = {
+#include "unpack.cl.xxd.txt"
 };
 
 dedisp_error unpack(cl::Buffer d_transposed,
@@ -421,22 +339,23 @@ dedisp_error unpack(cl::Buffer d_transposed,
                     cl::Buffer d_unpacked,
                     dedisp_size in_nbits, dedisp_size out_nbits)
 {
-
-    boost::compute::buffer_iterator<dedisp_word> d_transposed_begin(dedisp::convert(d_transposed), 0);
-    boost::compute::buffer_iterator<dedisp_word> d_unpacked_begin(dedisp::convert(d_unpacked), 0);
-
     dedisp_size expansion = out_nbits / in_nbits;
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 
-    using boost::compute::make_counting_iterator;
-
-    boost::compute::transform(make_counting_iterator<unsigned int>(0),
-                              make_counting_iterator<unsigned int>(out_count),
-                              d_unpacked_begin,
-                              unpack_functor<dedisp_word>(d_transposed_begin, nsamps,
-                                                          in_nbits, out_nbits),
-                              dedisp::device_manager::instance().current_queue_bc());
+    cl::Program program(dedisp::device_manager::instance().current_context(), unpack_kernel_src);
+    string build_arguments = dedisp::type_define_arguments;
+    program.build(build_arguments.c_str());
+    cl::Kernel kernel(program, "unpack_kernel");
+    /* __kernel void unpack_kernel(__global WordType* in, __global dedisp_word* out, int nsamps, int in_nbits, int out_nbits); */
+    kernel.setArg(0, d_transposed);
+    kernel.setArg(1, d_unpacked);
+    kernel.setArg(2, (cl_int) nsamps);
+    kernel.setArg(3, (cl_int) in_nbits);
+    kernel.setArg(4, (cl_int) out_nbits);
+    cl::CommandQueue queue = dedisp::device_manager::instance().current_queue();
+    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(out_count));
+    queue.finish();
 
     return DEDISP_NO_ERROR;
 }

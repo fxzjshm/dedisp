@@ -57,9 +57,6 @@ using std::endl;
 #endif
 // -----------------------------------------
 
-#include "utils.dp.hpp"
-#include "gpu_memory.hpp"
-#include "transpose.hpp"
 
 
 #define DEDISP_DEFAULT_GULP_SIZE 65536 //131072
@@ -74,6 +71,10 @@ using std::endl;
 #define DEDISP_MAX_NCHANS 8192
 // Internal word type used for transpose and dedispersion kernel
 typedef unsigned int dedisp_word;
+
+#include "utils.dp.hpp"
+#include "gpu_memory.hpp"
+#include "transpose.hpp"
 // Note: This must be included after the above #define and typedef
 #include "kernels.dp.hpp"
 

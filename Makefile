@@ -22,7 +22,7 @@ HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
-CL_SOURCES := $(SRC_DIR)/transpose.cl $(SRC_DIR)/dedisperse.cl
+CL_SOURCES := $(SRC_DIR)/transpose.cl $(SRC_DIR)/dedisperse.cl $(SRC_DIR)/unpack.cl $(SRC_DIR)/scrunch_x2.cl
 CL_XXD_FILES := $(patsubst $(SRC_DIR)/%.cl, $(SRC_DIR)/%.cl.xxd.txt, $(CL_SOURCES))
 
 LIB_NAME  := libdedisp
