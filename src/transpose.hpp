@@ -47,12 +47,12 @@ struct Transpose {
 	
 	Transpose() {}
 
-        void transpose(cl::Buffer& in, size_t width, size_t height,
-                       size_t in_stride, size_t out_stride, cl::Buffer& out,
-                       const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue());
-        void transpose(cl::Buffer& in, size_t width, size_t height, cl::Buffer& out,
-                       const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
-                transpose(in, width, height, width, height, out, stream);
+    void transpose(cl::Buffer& in, size_t width, size_t height,
+                   size_t in_stride, size_t out_stride, cl::Buffer& out,
+                   const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue());
+    void transpose(cl::Buffer& in, size_t width, size_t height, cl::Buffer& out,
+                   const cl::CommandQueue& stream = dedisp::device_manager::instance().current_queue()) {
+            transpose(in, width, height, width, height, out, stream);
 	}
 private:
 	// TODO: These should probably be imported from somewhere else
@@ -103,11 +103,11 @@ char transpose_kernel_src[] = {
 
 
 template <typename T>
-void transpose(cl::Buffer& in,
-							 size_t width, size_t height,
-							 size_t in_stride, size_t out_stride,
-                             cl::Buffer& out,
-                             const cl::CommandQueue& stream)
+void Transpose<T>::transpose(cl::Buffer& in,
+               size_t width, size_t height,
+               size_t in_stride, size_t out_stride,
+               cl::Buffer& out,
+               const cl::CommandQueue& stream)
 {
 	// Parameter checks
 	// TODO: Implement some sort of error returning!
@@ -119,9 +119,10 @@ void transpose(cl::Buffer& in,
 	if( height > out_stride )
 		return; //throw std::runtime_error("Transpose: height exceeds out_stride");
 
+    
 	// Specify thread decomposition (uses up-rounded divisions)
     cl::NDRange tot_block_count((width - 1) / TILE_DIM + 1,
-                                   (height - 1) / TILE_DIM + 1, 1);
+                                (height - 1) / TILE_DIM + 1, 1);
 
     size_t max_grid_dim = round_down_pow2((size_t)cuda_specs::MAX_GRID_DIMENSION);
 	
@@ -130,7 +131,7 @@ void transpose(cl::Buffer& in,
          block_y_offset < tot_block_count[1];
          block_y_offset += max_grid_dim) {
 
-        cl::NDRange block_count(1, 1, 1);
+        cl_uint block_count[3] = {1, 1, 1};
 
         // Handle the possibly incomplete final grid
         block_count[1] = min(max_grid_dim,
@@ -153,7 +154,6 @@ void transpose(cl::Buffer& in,
         	size_t h = min(max_grid_dim*TILE_DIM, height-y_offset);
         
             cl::NDRange block(TILE_DIM, BLOCK_ROWS, 1);
-            cl_int error;
 
             // TODO: Unfortunately there are cases where rounding to a power of 2 becomes
 			//       detrimental to performance. Could work out a heuristic.
@@ -161,18 +161,23 @@ void transpose(cl::Buffer& in,
 			bool round_grid_to_pow2 = true;
 			
             auto call_transpose_kernel = [=](bool GRID_IS_POW2, cl::NDRange grid, cl::NDRange block) {
+                cl_int error;
                 cl::Program program(dedisp::device_manager::instance().current_context(),
                                     transpose_kernel_src, /* build = */ false);
                 std::string build_arguments;
-                build_arguments += string("-DT_TYPE=") + dedisp::get_cl_typename<T>() + " ";
-                build_arguments += string("-DTILE_DIM=") + TILE_DIM + " ";
-                build_arguments += string("-DBLOCK_ROWS=") + BLOCK_ROWS + " ";
-                build_arguments += string("-DGRID_IS_POW2=") + int(GRID_IS_POW2) + " ";
+                build_arguments += std::string("-DT_TYPE=") + dedisp::get_cl_typename<T>() + " ";
+                build_arguments += std::string("-DTILE_DIM=") + std::to_string(TILE_DIM) + " ";
+                build_arguments += std::string("-DBLOCK_ROWS=") + std::to_string(BLOCK_ROWS) + " ";
+                build_arguments += std::string("-DGRID_IS_POW2=") + std::to_string(int(GRID_IS_POW2)) + " ";
                 error = program.build(build_arguments.c_str());
                 if (error != CL_SUCCESS) {
-                    string build_log = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
-                    std::cerr << "Build OpenCL source fail at" << __FILE__ << ":" << __LINE__ << std::endl
-                              << build_log << std::endl;
+                    std::cerr << "Build OpenCL source fail at" << __FILE__ << ":" << __LINE__ << std::endl;
+                    auto build_logs = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
+                    for (auto pair : build_logs) {
+                        std::cerr << "Build log of device" << pair.first.getInfo<CL_DEVICE_NAME>() << "is: " << std::endl
+                                  << pair.second << std::endl;
+                    }
+                    
                 }
                 cl::Kernel kernel(program, "transpose_kernel", &error);
                 /*
@@ -213,7 +218,7 @@ void transpose(cl::Buffer& in,
             }
 			
 #ifndef NDEBUG
-            error = stream.finish();
+            cl_int error = stream.finish();
 			if( error != CL_SUCCESS ) {
 				/*
 				throw std::runtime_error(
