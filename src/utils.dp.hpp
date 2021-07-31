@@ -22,6 +22,7 @@
 
 #include "dedisp.h"
 #include <CL/opencl.hpp>
+#include <boost/compute.hpp>
 #include <iostream>
 #include <stdexcept>
 #include <mutex>
@@ -44,6 +45,9 @@ public:
         device = d;
         context = cl::Context(device);
         queue = cl::CommandQueue(context);
+        device_bc = boost::compute::device(device.get());
+        context_bc = boost::compute::context(context.get());
+        queue_bc = boost::compute::command_queue(queue.get());
     }
 
     inline cl::CommandQueue default_queue() {
@@ -58,13 +62,29 @@ public:
         return device;
     }
 
+    inline boost::compute::device default_device_bc() {
+        return device_bc;
+    }
+
+    inline boost::compute::context default_context_bc() {
+        return context_bc;
+    }
+
+    inline boost::compute::command_queue default_queue_bc() {
+        return queue_bc;
+    }
+
 private:
     cl::Device device;
     cl::CommandQueue queue;
     cl::Context context;
+    boost::compute::device device_bc;
+    boost::compute::context context_bc;
+    boost::compute::command_queue queue_bc;
 };
 
 // acts like Intel's DPCT dpct/device.hpp
+// not using boost::compute::system::default_device() as it cannot be changed easily
 class device_manager {
 public:
     static device_manager& instance() {
@@ -87,6 +107,18 @@ public:
 
     inline cl::CommandQueue current_queue() {
         return current_device().default_queue();
+    }
+
+    inline boost::compute::device current_device_bc() {
+        return current_device().default_device_bc();
+    }
+
+    inline boost::compute::context current_context_bc() {
+        return current_device().default_context_bc();
+    }
+
+    inline boost::compute::command_queue current_queue_bc() {
+        return current_device().default_queue_bc();
     }
 
     inline cl_int select_device(dedisp_size _id) {
@@ -124,57 +156,6 @@ private:
     device_manager(const device_manager&) = delete;
 	device_manager& operator=(const device_manager&) = delete;
     
-};
-
-// wrapper for cl::Buffer, emulates CUDA or DPCT's device_vector
-template<typename T>
-class device_vector {
-public:
-    device_vector() = default;
-
-    device_vector(cl::Buffer buffer) {
-        buf = buffer;
-    }
-
-    cl_uint size() {
-        return buf.getInfo<CL_MEM_SIZE>();
-    }
-
-    void resize(dedisp_size n) {
-        cl_int error;
-        cl::CommandQueue& queue = device_manager::instance().current_queue();
-        dedisp_size size = n * sizeof(T);
-        cl::Buffer new_buf = cl::Buffer(device_manager::instance().current_context(), CL_MEM_READ_WRITE, size, nullptr, &error);
-        cl_check(error);
-        if (buf.get()) {
-            error = queue.enqueueCopyBuffer(buf, new_buf, 0, 0, std::min(this.size(), size));
-            cl_check(error);
-            error = queue.finish();
-            cl_check(error);
-        }
-        std::lock_guard<std::mutex> lock(m_mutex);
-        buf = new_buf;
-    }
-
-    void operator=(std::vector<T>& vec) {
-        queue.enqueueWriteBuffer(buf, /* blocking = */ CL_TRUE, 0, vec.size(), &vec[0]);
-    }
-
-    cl_int fill(T src) {
-        return device_manager::instance().current_queue().enqueueFillBuffer(buf, src, 0, size());
-    }
-
-    cl::Buffer buffer() {
-        return this->buf;
-    }
-
-    operator cl::Buffer() const {
-        return this->buf;
-    }
-
-private:
-    cl::Buffer buf;
-    mutable std::mutex m_mutex;
 };
 
 template<typename T>
@@ -218,4 +199,20 @@ inline std::string get_cl_typename() {
     return ret;
 }
 
+#define MAKE_CL_BC_CONVERTER(typename_cl, typename_bc) \
+    inline typename_bc convert(typename_cl p) { \
+        return typename_bc(p.get()); \
+    }
+
+#define MAKE_CL_BC_CONVERTER_2(typename_cl, typename_bc) \
+    MAKE_CL_BC_CONVERTER(typename_cl, typename_bc) \
+    MAKE_CL_BC_CONVERTER(typename_bc, typename_cl)
+
+    MAKE_CL_BC_CONVERTER_2(cl::Buffer, boost::compute::buffer);
+    MAKE_CL_BC_CONVERTER_2(cl::CommandQueue, boost::compute::command_queue);
+    MAKE_CL_BC_CONVERTER_2(cl::Context, boost::compute::context);
+    MAKE_CL_BC_CONVERTER_2(cl::Device, boost::compute::device);
+
+#undef MAKE_CL_BC_CONVERTER_2
+#undef MAKE_CL_BC_CONVERTER
 } // namespace dedisp

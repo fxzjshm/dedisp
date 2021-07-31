@@ -12,6 +12,7 @@ SHELL := /bin/bash
 
 # ONEAPI_PATH      ?= /opt/intel/oneapi
 CL_INCLUDE_DIR   ?= /opt/OpenCL-CLHPP/include
+BOOST_COMPUTE_INLCUDE_DIR ?= /opt/boost.compute/include
 CXX_STD          ?= c++17
 
 LIB_ARCH   = lib64

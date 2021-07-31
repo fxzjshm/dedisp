@@ -13,16 +13,16 @@ OPTIMISE  := -O3
 # Note: Using -G makes the GPU kernel 16x slower!
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
-INCLUDE   := -I$(SRC_DIR) -I$(CL_INCLUDE_DIR)
+INCLUDE   := -I$(SRC_DIR) -I$(CL_INCLUDE_DIR) -I$(BOOST_COMPUTE_INLCUDE_DIR)
 # LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
-LIB       := -lstdc++
+LIB       := -lstdc++ -lOpenCL
 
 SOURCES   := $(SRC_DIR)/dedisp.dp.cpp
 HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
-CL_SOURCES := $(SRC_DIR)/transpose.cl
+CL_SOURCES := $(SRC_DIR)/transpose.cl $(SRC_DIR)/dedisperse.cl
 CL_XXD_FILES := $(patsubst $(SRC_DIR)/%.cl, $(SRC_DIR)/%.cl.xxd.txt, $(CL_SOURCES))
 
 LIB_NAME  := libdedisp
@@ -33,7 +33,7 @@ MINOR     := 0.1
 SO_FILE   := $(LIB_NAME)$(SO_EXT).$(MAJOR).$(MINOR)
 SO_NAME   := $(LIB_DIR)/$(SO_FILE)
 A_NAME    := $(LIB_DIR)/$(LIB_NAME)$(A_EXT)
-LD_FLAGS  := -shared -fPIC -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -lOpenCL
+LD_FLAGS  := -shared -fPIC -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR)
 
 # PTX_NAME  := ./dedisp_kernels.ptx
 

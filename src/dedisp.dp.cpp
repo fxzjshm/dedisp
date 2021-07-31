@@ -33,6 +33,7 @@
 #include <vector>
 #include <algorithm> // For std::fill
 #include <cmath>
+#include <cstdlib>
 
 #include <CL/opencl.hpp>
 using namespace cl;
@@ -43,6 +44,7 @@ using namespace cl;
 
 #if defined(DEDISP_DEBUG) && DEDISP_DEBUG
 #include <stdio.h> // For printf
+#define BOOST_COMPUTE_DEBUG_KERNEL_COMPILATION
 #endif
 
 // TODO: Remove these when done benchmarking
@@ -55,9 +57,10 @@ using std::endl;
 #endif
 // -----------------------------------------
 
+#include "utils.dp.hpp"
 #include "gpu_memory.hpp"
 #include "transpose.hpp"
-#include "utils.dp.hpp"
+
 
 #define DEDISP_DEFAULT_GULP_SIZE 65536 //131072
 
@@ -91,10 +94,10 @@ struct dedisp_plan_struct {
 	std::vector<dedisp_bool>  killmask;     // size = nchans
 	std::vector<dedisp_size>  scrunch_list; // size = dm_count
 	// Device arrays
-    dedisp::device_vector<dedisp_float> d_dm_list;
-    dedisp::device_vector<dedisp_float> d_delay_table;
-    dedisp::device_vector<dedisp_bool> d_killmask;
-    dedisp::device_vector<dedisp_size> d_scrunch_list;
+    boost::compute::vector<dedisp_float> d_dm_list;
+    boost::compute::vector<dedisp_float> d_delay_table;
+    boost::compute::vector<dedisp_bool> d_killmask;
+    boost::compute::vector<dedisp_size> d_scrunch_list;
     //StreamType stream;
 	// Scrunching parameters
 	dedisp_bool  scrunching_enabled;
@@ -208,6 +211,13 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
 	plan->df            = df;
 	//plan->stream        = 0;
 	
+	// constrct buffers on correct context
+	boost::compute::context context(dedisp::device_manager::instance().current_context().get());
+	plan->d_delay_table = boost::compute::vector<dedisp_float>(context);
+	plan->d_dm_list = boost::compute::vector<dedisp_float>(context);
+	plan->d_killmask = boost::compute::vector<dedisp_bool>(context);
+	plan->d_scrunch_list = boost::compute::vector<dedisp_size>(context);
+
 	// Generate delay table and copy to device memory
 	// Note: The DM factor is left out and applied during dedispersion
 	plan->delay_table.resize(plan->nchans);
@@ -343,10 +353,10 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
 
 dedisp_error dedisp_set_device(int device_idx) {
     int error = dedisp::device_manager::instance().select_device(device_idx);
-    // Note: cudaErrorInvalidValue isn't a documented return value, but
-	//         it still gets returned :/
+    string device_name = dedisp::device_manager::instance().current_device().unwrap().getInfo<CL_DEVICE_NAME>();
+    setenv("BOOST_COMPUTE_DEFAULT_DEVICE", device_name.c_str(), /* __replace = */ true);
 #if defined(DEDISP_DEBUG) && DEDISP_DEBUG
-	printf("Currently using device %s\n", dedisp::device_manager::instance().current_device().unwrap().get_info<CL_DEVICE_NAME>().c_str());
+    printf("Currently using device %s\n", device_name.c_str());
 #endif
     if (CL_INVALID_ARG_VALUE == error)
             throw_error(DEDISP_INVALID_DEVICE_INDEX);
@@ -371,7 +381,9 @@ dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 	else {
 		// Set the killmask to all true
 		std::fill(plan->killmask.begin(), plan->killmask.end(), (dedisp_bool)true);
-		plan->d_killmask.fill((dedisp_bool) true);
+        boost::compute::command_queue queue_bc = dedisp::device_manager::instance().current_queue_bc();
+        boost::compute::fill(plan->d_killmask.begin(), plan->d_killmask.end(),
+                             (dedisp_bool)true, queue_bc);
     }
 	return DEDISP_NO_ERROR;
 }
@@ -497,13 +509,13 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	//         breaking its API in v5.0 I had to mess it up like this.
 	cl::Context	context = dedisp::device_manager::instance().current_context();
 	cl::CommandQueue queue = dedisp::device_manager::instance().current_queue();
-	cl_int error = queue.enqueueWriteBuffer(plan->d_delay_table.buffer(), true, 0,
+	cl_int error = queue.enqueueWriteBuffer(cl::Buffer(plan->d_delay_table.get_buffer().get()), true, 0,
 											plan->nchans * sizeof(dedisp_float),
 											c_delay_table);
 	if( error != CL_SUCCESS ) {
 		throw_error(DEDISP_MEM_COPY_FAILED);
 	}
-    cl_int error = queue.enqueueWriteBuffer(plan->d_killmask.buffer(), true, 0,
+    error = queue.enqueueWriteBuffer(cl::Buffer(plan->d_killmask.get_buffer().get()), true, 0,
 											plan->nchans * sizeof(dedisp_float),
 											c_killmask);
 	if( error != CL_SUCCESS ) {
@@ -575,23 +587,29 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	cl::Buffer d_transposed;
 	cl::Buffer d_unpacked;
 	cl::Buffer d_out;
-    dedisp::device_vector<dedisp_word> d_in_buf;
-    dedisp::device_vector<dedisp_word> d_transposed_buf;
-    dedisp::device_vector<dedisp_word> d_unpacked_buf;
-    dedisp::device_vector<dedisp_byte> d_out_buf;
+    boost::compute::vector<dedisp_word> d_in_buf;
+    boost::compute::vector<dedisp_word> d_transposed_buf;
+    boost::compute::vector<dedisp_word> d_unpacked_buf;
+    boost::compute::vector<dedisp_byte> d_out_buf;
     // Allocate temporary buffers on the device where necessary
 	if( using_host_memory || !friendly_in_stride ) {
+		/*
 		try { d_in_buf.resize(in_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-        d_in = d_in_buf.buffer();
+        d_in = cl::Buffer(d_in_buf.get_buffer().get());
+		*/
+	    d_in = cl::Buffer(context, CL_MEM_USE_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), in);
     }
 	else {
 		d_in = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, in_count_gulp_max * sizeof(dedisp_word), in);
 	}
 	if( using_host_memory ) {
+		/*
 		try { d_out_buf.resize(out_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-        d_out = d_out_buf.buffer();
+        d_out = cl::Buffer(d_out_buf.get_buffer().get());
+		*/
+	    d_out = cl::Buffer(context, CL_MEM_USE_HOST_PTR, out_count_gulp_max * sizeof(dedisp_word), out);
     }
 	else {
 		d_out = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, out_count_gulp_max * sizeof(dedisp_word), out);
@@ -599,12 +617,12 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	//// Note: * 2 here is for the time-scrunched copies of the data
 	try { d_transposed_buf.resize(in_count_padded_gulp_max/* * 2 */); }
 	catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-    d_transposed = d_transposed_buf.buffer();
+    d_transposed = cl::Buffer(d_transposed_buf.get_buffer().get());
 
     // Note: * 2 here is for the time-scrunched copies of the data
 	try { d_unpacked_buf.resize(unpacked_count_padded_gulp_max * 2); }
 	catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-    d_unpacked = d_unpacked_buf.buffer();
+    d_unpacked = cl::Buffer(d_unpacked_buf.get_buffer().get());
     // -------------------------------
 	
 	// The stride (in words) between differently-scrunched copies of the
@@ -711,10 +729,10 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 				//scrunch_x2(&d_transposed[scrunch_in_offset],
 				//           nsamps_padded_gulp/(s/2), nchan_words, in_nbits,
 				//           &d_transposed[scrunch_out_offset]);
-				scrunch_x2(&d_unpacked[scrunch_in_offset],
+				scrunch_x2(d_unpacked, scrunch_in_offset,
 				           nsamps_padded_gulp/(s/2),
 				           unpacked_nchan_words, unpacked_in_nbits,
-				           &d_unpacked[scrunch_out_offset]);
+				           d_unpacked, scrunch_out_offset);
 				scrunch_in_offset = scrunch_out_offset;
 				scrunch_out_offset += scrunch_stride / s;
 			}
@@ -807,7 +825,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 			//         Need to avoid assumption that scrunch starts at 1
 			//         Must start the scrunch at the first *requested* DM
 
-            dedisp::device_vector<dedisp_float> d_scrunched_dm_list(dm_count);
+            boost::compute::vector<dedisp_float> d_scrunched_dm_list(dm_count);
             dedisp_size scrunch_start = 0;
 			dedisp_size scrunch_offset = 0;
 			for( dedisp_size s=0; s<dm_count; ++s ) {
@@ -821,26 +839,25 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 					// Make a copy of the dm list divided by the scrunch factor
 					// Note: This has the effect of increasing dt in the delay eqn
 					dedisp_size dm_offset = first_dm_idx + scrunch_start;
-                    std::transform(oneapi::dpl::execution::make_device_policy(dedisp::device_manager::instance().current_device().default_queue()),
-                                   plan->d_dm_list.begin() + dm_offset,
-                                   plan->d_dm_list.begin() + dm_offset + scrunch_count,
-                                   dpct::make_constant_iterator(cur_scrunch),
-                                   d_scrunched_dm_list.begin(),
-                                   std::divides<dedisp_float>());
-                    dedisp_float *d_scrunched_dm_list_ptr = dpct::get_raw_pointer(&d_scrunched_dm_list[0]);
+                    boost::compute::transform(plan->d_dm_list.begin() + dm_offset,
+                                              plan->d_dm_list.begin() + dm_offset + scrunch_count,
+                                              boost::compute::make_constant_iterator(cur_scrunch),
+                                              d_scrunched_dm_list.begin(),
+                                              std::divides<dedisp_float>());
+                    cl::Buffer d_scrunched_dm_list_ptr = dedisp::convert(d_scrunched_dm_list.get_buffer());
 
                     // TODO: Is this how the nsamps vars need to change?
 					if( !dedisperse(//&d_transposed[scrunch_offset],
-					                &d_unpacked[scrunch_offset],
+					                d_unpacked, scrunch_offset,
 					                nsamps_padded_gulp / cur_scrunch,
 					                nsamps_computed_gulp / cur_scrunch,
 					                unpacked_in_nbits, //in_nbits,
 					                plan->nchans,
 					                1,
-					                d_scrunched_dm_list_ptr,
+					                d_scrunched_dm_list_ptr, 0,
 					                scrunch_count, // dm_count
 					                1,
-					                d_out + scrunch_start*out_stride_gulp_bytes,
+					                d_out, scrunch_start*out_stride_gulp_bytes,
 					                out_stride_gulp_samples,
 					                out_nbits,
 					                1, 0, 0, 0, 0) ) {
@@ -853,16 +870,21 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		}
 		else {
 			// Perform direct dedispersion without scrunching
-                        if (!dedisperse( // d_transposed,
-                                d_unpacked, nsamps_padded_gulp,
+            if (!dedisperse( // d_transposed,
+                                d_unpacked, 0,
+                                nsamps_padded_gulp,
                                 nsamps_computed_gulp,
                                 unpacked_in_nbits, // in_nbits,
-                                plan->nchans, 1,
-                                dpct::get_raw_pointer(
-                                    &plan->d_dm_list[first_dm_idx]),
-                                dm_count, 1, d_out, out_stride_gulp_samples,
-                                out_nbits, 1, 0, 0, 0, 0)) {
-                                throw_error(DEDISP_INTERNAL_GPU_ERROR);
+                                plan->nchans,
+                                1,
+                                dedisp::convert(plan->d_dm_list.get_buffer()), first_dm_idx,
+                                dm_count,
+                                1,
+                                d_out, 0,
+                                out_stride_gulp_samples,
+                                out_nbits,
+                                1, 0, 0, 0, 0)) {
+                throw_error(DEDISP_INTERNAL_GPU_ERROR);
 			}
 		}
 #endif // SB/direct algorithm
@@ -888,17 +910,17 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 						dedisp_size scrunch_count = s+1 - scrunch_start;
 						
 						dedisp_size  src_stride = out_stride_gulp_bytes;
-						dedisp_byte* src = d_out + scrunch_start * src_stride;
+						cl::Buffer src = d_out; // offset = + scrunch_start * src_stride
 						dedisp_byte* dst = (out + scrunch_start * out_stride
 						                    + gulp_samp_byte_idx / cur_scrunch);
 						dedisp_size  width = nsamp_bytes_computed_gulp / cur_scrunch;
 						dedisp_size  height = scrunch_count;
-						copy_device_to_host_2d(dst,                       // dst
-						                       out_stride,                // dst stride
-						                       src,                       // src
-						                       src_stride,                // src stride
-						                       width,                     // width bytes
-						                       height);                   // height
+						copy_device_to_host_2d(dst, 0,                          // dst, dst_offset
+						                       out_stride,                      // dst stride
+						                       src, scrunch_start * src_stride, // src, src_offset
+						                       src_stride,                      // src stride
+						                       width,                           // width bytes
+						                       height);                         // height
 						scrunch_start += scrunch_count;
 					}
 				}
@@ -938,7 +960,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif
 	
 	if( !(flags & DEDISP_ASYNC) ) {
-                stream->wait();
+                queue.finish();
         }
 	
 	// Phew!
