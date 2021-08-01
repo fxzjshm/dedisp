@@ -512,19 +512,15 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	// Copy the lookup tables to constant memory on the device
 	// TODO: This was much tidier, but thanks to CUDA's insistence on
 	//         breaking its API in v5.0 I had to mess it up like this.
-    bc::context    context = bc::system::default_context();
+    bc::context context = bc::system::default_context();
     bc::command_queue queue = bc::system::default_queue();
     try {
-        queue.enqueue_write_buffer(plan->d_delay_table.get_buffer(), 0,
-                                   plan->nchans * sizeof(dedisp_float),
-                                   c_delay_table);
+        c_delay_table = plan->d_delay_table.get_buffer();
     } catch(...) {
         throw_error(DEDISP_MEM_COPY_FAILED);
     }
     try {
-        queue.enqueue_write_buffer(plan->d_killmask.get_buffer(), 0,
-                                   plan->nchans * sizeof(dedisp_float),
-                                   c_killmask);
+        c_killmask = plan->d_killmask.get_buffer();
     } catch(...) {
         throw_error(DEDISP_MEM_COPY_FAILED);
     }
@@ -594,42 +590,42 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
     bc::buffer d_transposed;
     bc::buffer d_unpacked;
     bc::buffer d_out;
-    boost::compute::vector<dedisp_word> d_in_buf;
-    boost::compute::vector<dedisp_word> d_transposed_buf;
-    boost::compute::vector<dedisp_word> d_unpacked_buf;
-    boost::compute::vector<dedisp_byte> d_out_buf;
+    bc::vector<dedisp_word> d_in_buf;
+    bc::vector<dedisp_word> d_transposed_buf;
+    bc::vector<dedisp_word> d_unpacked_buf;
+    bc::vector<dedisp_byte> d_out_buf;
     // Allocate temporary buffers on the device where necessary
+    /*
 	if( using_host_memory || !friendly_in_stride ) {
-		/*
 		try { d_in_buf.resize(in_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-        d_in = bc::buffer(d_in_buf.get_buffer().get());
-		*/
-        d_in = bc::buffer(context, in_count_gulp_max * sizeof(dedisp_word), CL_MEM_USE_HOST_PTR, const_cast<dedisp_byte *>(in));
+        d_in = d_in_buf.get_buffer();
     }
 	else {
-        d_in = bc::buffer(context, in_count_gulp_max * sizeof(dedisp_word), CL_MEM_COPY_HOST_PTR, const_cast<dedisp_byte *>(in));
+        d_in = (dedisp_word*)in;
 	}
+    */
+    d_in = bc::buffer(context, in_count_gulp_max * sizeof(dedisp_word), CL_MEM_COPY_HOST_PTR, const_cast<dedisp_byte *>(in));
+    /*
 	if( using_host_memory ) {
-		/*
 		try { d_out_buf.resize(out_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-        d_out = bc::buffer(d_out_buf.get_buffer().get());
-		*/
-        d_out = bc::buffer(context, out_count_gulp_max * sizeof(dedisp_word), CL_MEM_USE_HOST_PTR, out);
+        d_out = d_out_buf.get_buffer();
     }
 	else {
-        d_out = bc::buffer(context, out_count_gulp_max * sizeof(dedisp_word), CL_MEM_COPY_HOST_PTR, out);
+        d_out = out;
 	}
+    */
+    d_out = bc::buffer(context, out_count_gulp_max * sizeof(dedisp_byte), CL_MEM_COPY_HOST_PTR, out);
 	//// Note: * 2 here is for the time-scrunched copies of the data
 	try { d_transposed_buf.resize(in_count_padded_gulp_max/* * 2 */); }
 	catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-    d_transposed = bc::buffer(d_transposed_buf.get_buffer().get());
+    d_transposed = d_transposed_buf.get_buffer();
 
     // Note: * 2 here is for the time-scrunched copies of the data
 	try { d_unpacked_buf.resize(unpacked_count_padded_gulp_max * 2); }
 	catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
-    d_unpacked = bc::buffer(d_unpacked_buf.get_buffer().get());
+    d_unpacked = d_unpacked_buf.get_buffer();
     // -------------------------------
 	
 	// The stride (in words) between differently-scrunched copies of the

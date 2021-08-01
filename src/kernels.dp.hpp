@@ -35,8 +35,10 @@ namespace bc = boost::compute;
 #define DEDISP_BLOCK_SAMPS      8
 #define DEDISP_SAMPS_PER_THREAD 2 // 4 is better for Fermi?
 
-dedisp_float c_delay_table[DEDISP_MAX_NCHANS];
-dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
+// dedisp_float c_delay_table[DEDISP_MAX_NCHANS];
+// dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
+bc::buffer c_delay_table;
+bc::buffer c_killmask;
 
 template<int NBITS, typename T=unsigned int>
 struct max_value {
@@ -143,8 +145,8 @@ bool dedisperse(bc::buffer       d_in,
     bc::command_queue stream = bc::system::default_queue();
 
     bc::context context = bc::system::default_context();
-    bc::buffer d_c_delay_table(context, (size_t)DEDISP_MAX_NCHANS, CL_MEM_COPY_HOST_PTR, c_delay_table);
-    bc::buffer d_c_killmask(context, (size_t)DEDISP_MAX_NCHANS, CL_MEM_COPY_HOST_PTR, c_killmask);
+    // bc::buffer d_c_delay_table(context, (size_t)DEDISP_MAX_NCHANS, CL_MEM_COPY_HOST_PTR, c_delay_table);
+    // bc::buffer d_c_killmask(context, (size_t)DEDISP_MAX_NCHANS, CL_MEM_COPY_HOST_PTR, c_killmask);
 
     // Execute the kernel
     auto DEDISP_CALL_KERNEL = [&](int NBITS) {
@@ -214,8 +216,8 @@ __kernel void dedisperse_kernel(
         kernel.set_arg(18, batch_dm_stride);
         kernel.set_arg(19, batch_chan_stride);
         kernel.set_arg(20, batch_out_stride);
-        kernel.set_arg(21, d_c_delay_table);
-        kernel.set_arg(22, d_c_killmask);
+        kernel.set_arg(21, c_delay_table);
+        kernel.set_arg(22, c_killmask);
 
         bc::extents<3> global_size = bc::dim(grid[0] * block[0], grid[1] * block[1], grid[2] * block[2]);
         stream.enqueue_nd_range_kernel(kernel, 3, nullptr, global_size.data(), block.data());

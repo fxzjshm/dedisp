@@ -40,6 +40,8 @@
 #define BLOCK_DIM_Y (DEDISP_BLOCK_SIZE / DEDISP_BLOCK_SAMPS)
 #endif
 
+#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
+
 typedef DEDISP_WORD_TYPE dedisp_word;
 typedef DEDISP_SIZE_TYPE dedisp_size;
 typedef DEDISP_FLOAT_TYPE dedisp_float;
@@ -223,7 +225,7 @@ __kernel void dedisperse_kernel(
                                                              sum[s], nchans);
                         */
                         
-                        ((unsigned char*)(d_out[d_out_offset]))[out_idx + s] = scale_output_uchar(sum[s], nchans);
+                        ((__global unsigned char*)(d_out + d_out_offset))[out_idx + s] = scale_output_uchar(sum[s], nchans);
                     }
                 }
                 break;
@@ -235,7 +237,7 @@ __kernel void dedisperse_kernel(
                         set_out_val<unsigned short, IN_NBITS>(d_out, out_idx + s,
                                                               sum[s], nchans);
                         */
-                        ((unsigned short*)(d_out[d_out_offset]))[out_idx + s] = scale_output_ushort(sum[s], nchans);
+                        ((__global unsigned short*)(d_out + d_out_offset))[out_idx + s] = scale_output_ushort(sum[s], nchans);
                     }
                 }
                 break;
@@ -247,7 +249,7 @@ __kernel void dedisperse_kernel(
                         set_out_val<float, IN_NBITS>(d_out, out_idx + s,
                                                      sum[s], nchans);
                         */
-                        ((float*)(d_out[d_out_offset]))[out_idx + s] = scale_output_float(sum[s], nchans);
+                        ((__global float*)(d_out + d_out_offset))[out_idx + s] = scale_output_float(sum[s], nchans);
                     }
                 }
                 break;
