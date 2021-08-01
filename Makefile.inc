@@ -11,7 +11,7 @@ SHELL := /bin/bash
 # GPU_ARCH   ?= sm_30
 
 # ONEAPI_PATH      ?= /opt/intel/oneapi
-CL_INCLUDE_DIR   ?= /opt/OpenCL-CLHPP/include
+CL_INCLUDE_DIR   ?= /opt/OpenCL-Headers
 BOOST_COMPUTE_INLCUDE_DIR ?= /opt/boost.compute/include
 CXX_STD          ?= c++17
 
