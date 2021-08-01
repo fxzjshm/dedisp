@@ -353,21 +353,21 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
 }
 
 dedisp_error dedisp_set_device(int device_idx) {
-    std::string device_name = bc::system::devices()[device_idx].get_info<CL_DEVICE_NAME>();
+    std::vector<bc::device> devices = bc::system::devices();
+    if (device_idx >= devices.size()) {
+        throw_error(DEDISP_INVALID_DEVICE_INDEX);
+    }
+    std::string device_name = devices[device_idx].get_info<CL_DEVICE_NAME>();
     setenv("BOOST_COMPUTE_DEFAULT_DEVICE", device_name.c_str(), /* __replace = */ true);
-	setenv("BOOST_COMPUTE_DEFAULT_ENFORCE", "1", /* __replace = */ true);
-	std::cout << boost::compute::system::default_device().get_info<CL_DEVICE_NAME>() << std::endl;
-	try {
-        assert(boost::compute::system::default_device().get_info<CL_DEVICE_NAME>() == device_name);
-	} catch(bc::no_device_found exception) {
-		throw_error(DEDISP_INVALID_DEVICE_INDEX);
-	} catch(...) {
-		throw_error(DEDISP_UNKNOWN_ERROR);
-	}
-	
-#if defined(DEDISP_DEBUG) && DEDISP_DEBUG
-    printf("Currently using device %s\n", device_name.c_str());
+    setenv("BOOST_COMPUTE_DEFAULT_ENFORCE", "1", /* __replace = */ true);
+#ifdef DEDISP_DEBUG
+    std::cout << "Using device " << device_name << std::endl;
 #endif
+    try {
+        assert(boost::compute::system::default_device().get_info<CL_DEVICE_NAME>() == device_name);
+    } catch(...) {
+        throw_error(DEDISP_UNKNOWN_ERROR);
+    }
     return DEDISP_NO_ERROR;
 }
 
