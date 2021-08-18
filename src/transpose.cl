@@ -94,7 +94,7 @@ __kernel void transpose_kernel(__global const T* in, gpu_size_t in_offset,
     if( index_out_x >= height ) return;
     gpu_size_t index_out_y = blockIdx_x * TILE_DIM + threadIdx.y;
     gpu_size_t index_out = index_out_x + (index_out_y)*out_stride;
-    
+
 #pragma unroll
     for( gpu_size_t i=0; i<TILE_DIM; i+=BLOCK_ROWS ) {
         // Avoid excess threads

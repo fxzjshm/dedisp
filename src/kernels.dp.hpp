@@ -163,7 +163,7 @@ bool dedisperse(bc::buffer       d_in,
         try {
             program.build(build_arguments.c_str());
         } catch(bc::opencl_error error) {
-            std::cerr << "Build OpenCL source fail at" << __FILE__ << ":" << __LINE__ << std::endl;
+            std::cerr << "Build OpenCL source fail at " << __FILE__ << ":" << __LINE__ << std::endl;
             std::cerr << "Build log is: " << std::endl
                       << program.build_log() << std::endl;
         }
