@@ -77,4 +77,16 @@ const std::string type_define_arguments =
     std::string(" -DDEDISP_FLOAT_TYPE=") + dedisp::get_cl_typename<dedisp_float>() + " " +
     std::string(" -DDEDISP_BYTE_TYPE=") + dedisp::get_cl_typename<dedisp_byte>() + " " +
     std::string(" -DDEDISP_BOOL_TYPE=") + dedisp::get_cl_typename<dedisp_bool>() + " ";
+
+// reference: https://github.com/ROCm-Developer-Tools/ROCclr/blob/b8e8dc020ae79efbe703f9ca6c5e842b22e35850/device/gpu/gpukernel.cpp#L1069
+inline size_t restrict_local_work_size(size_t global_size, size_t max_local_size) {
+    size_t t = max_local_size;
+    while (t--) {
+        if (global_size % t == 0) {
+            return t;
+        }
+    }
+    return 1;
+}
+
 } // namespace dedisp
