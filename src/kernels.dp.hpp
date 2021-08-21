@@ -264,7 +264,7 @@ dedisp_error scrunch_x2(bc::buffer  d_in, dedisp_size d_in_offset,
     kernel.set_arg(4, (cl_int) nbits);
     kernel.set_arg(5, (cl_uint) nsamps);
     bc::command_queue queue = bc::system::default_queue();
-    queue.enqueue_1d_range_kernel(kernel, 0, out_count, 0);
+    queue.enqueue_1d_range_kernel(kernel, 0, out_count, dedisp::restrict_local_work_size(out_count, queue.get_device().get_info<CL_DEVICE_MAX_WORK_GROUP_SIZE>()));
     queue.finish();
 
     return DEDISP_NO_ERROR;

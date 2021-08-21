@@ -25,7 +25,10 @@ typedef DEDISP_WORD_TYPE dedisp_word;
 typedef DEDISP_SIZE_TYPE dedisp_size;
 typedef dedisp_word WordType;
 
-__kernel void scrunch_x2_kernel(__global WordType* in, dedisp_size in_offset __global dedisp_word* outs, dedisp_size out_offset, int nbits, unsigned int in_nsamps) {
+__kernel void scrunch_x2_kernel(__global WordType* in, dedisp_size in_offset, __global dedisp_word* outs, dedisp_size out_offset, int nbits, unsigned int in_nsamps) {
+    unsigned int out_nsamps = in_nsamps / 2;
+    unsigned int mask = (1<<nbits)-1;
+
     unsigned int out_i = get_global_id(0);
 
     unsigned int c     = out_i / out_nsamps;
