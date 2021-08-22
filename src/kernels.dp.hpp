@@ -429,12 +429,7 @@ workgroup size if needed.
 		
 	// Check for kernel errors
 #ifdef DEDISP_DEBUG
-	//cudaStreamSynchronize(stream);
-	cudaThreadSynchronize();
-	cudaError_t cuda_error = cudaGetLastError();
-	if( cuda_error != cudaSuccess ) {
-		return false;
-	}
+	stream->wait();
 #endif // DEDISP_DEBUG
 	
 	return true;
