@@ -34,6 +34,9 @@
 #include <cmath>
 #include <cstdlib>
 
+#include "hd/utils/meta_kernel.dp.hpp"
+#include "hd/utils/buffer_iterator.dp.hpp"
+#include "hd/utils/scan_on_gpu.dp.hpp"
 #include <boost/compute.hpp>
 namespace bc = boost::compute;
 
