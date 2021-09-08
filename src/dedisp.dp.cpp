@@ -700,7 +700,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 			}
 		}
 #ifdef DEDISP_BENCHMARK
-		cudaThreadSynchronize();
+		queue.finish();
 		copy_to_timer.stop();
 		transpose_timer.start();
 #endif
@@ -711,7 +711,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		                    in_buf_stride_words, nsamps_padded_gulp,
 		                    d_transposed);
 #ifdef DEDISP_BENCHMARK
-		cudaThreadSynchronize();
+		queue.finish();
 		transpose_timer.stop();
 		
 		kernel_timer.start();
@@ -893,7 +893,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif // SB/direct algorithm
 
 #ifdef DEDISP_BENCHMARK
-		cudaThreadSynchronize();
+		queue.finish();
 		kernel_timer.stop();
 #endif
 		// Copy output back to host memory if necessary
@@ -937,7 +937,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 				                       dm_count);                 // height
 			}
 #ifdef DEDISP_BENCHMARK
-			cudaThreadSynchronize();
+			queue.finish();
 			copy_from_timer.stop();
 #endif
 		}
@@ -963,8 +963,8 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif
 	
 	if( !(flags & DEDISP_ASYNC) ) {
-                queue.finish();
-        }
+        queue.finish();
+    }
 	
 	// Phew!
 	return DEDISP_NO_ERROR;
