@@ -37,6 +37,7 @@
 #include "hd/utils/meta_kernel.dp.hpp"
 #include "hd/utils/buffer_iterator.dp.hpp"
 #include "hd/utils/scan_on_gpu.dp.hpp"
+#include "hd/utils/argument_wrapper.dp.hpp"
 #include <boost/compute.hpp>
 namespace bc = boost::compute;
 
@@ -847,7 +848,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 					dedisp_size dm_offset = first_dm_idx + scrunch_start;
                     boost::compute::transform(plan->d_dm_list.begin() + dm_offset,
                                               plan->d_dm_list.begin() + dm_offset + scrunch_count,
-                                              boost::compute::make_constant_iterator(cur_scrunch),
+                                              boost::compute::make_constant_iterator(argument_wrapper("cur_scrunch", cur_scrunch)),
                                               d_scrunched_dm_list.begin(),
                                               boost::compute::divides<dedisp_float>());
                     bc::buffer d_scrunched_dm_list_ptr = d_scrunched_dm_list.get_buffer();
