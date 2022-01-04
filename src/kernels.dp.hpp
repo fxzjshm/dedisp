@@ -40,6 +40,9 @@ namespace bc = boost::compute;
 bc::buffer c_delay_table;
 bc::buffer c_killmask;
 
+typedef bc::detail::lru_cache<std::string, bc::kernel> kernel_cache_type;
+BOOST_COMPUTE_DETAIL_GLOBAL_STATIC(kernel_cache_type, kernel_cache, (16));
+
 template<int NBITS, typename T=unsigned int>
 struct max_value {
 	static const T value = (((unsigned)1<<(NBITS-1))-1)*2+1;
@@ -151,23 +154,31 @@ bool dedisperse(bc::buffer       d_in,
     // Execute the kernel
     auto DEDISP_CALL_KERNEL = [&](int NBITS) {
         cl_int error;
-        bc::program program = bc::program::create_with_source(dedisperse_kernel_src, bc::system::default_context());
-        std::string build_arguments = dedisp::type_define_arguments;
-// macros need to be defined when compile:
-//     DEDISP_WORD_TYPE, DEDISP_SIZE_TYPE, DEDISP_FLOAT_TYPE, DEDISP_BYTE_TYPE, DEDISP_BOOL_TYPE
-//     int IN_NBITS, int SAMPS_PER_THREAD, int BLOCK_DIM_X, int BLOCK_DIM_Y
-        build_arguments += std::string("-DIN_NBITS=") + std::to_string(NBITS) + " ";
-        build_arguments += std::string("-DSAMPS_PER_THREAD=") + std::to_string(DEDISP_SAMPS_PER_THREAD) + " ";
-        build_arguments += std::string("-DBLOCK_DIM_X=") + std::to_string(BLOCK_DIM_X) + " ";
-        build_arguments += std::string("-DBLOCK_DIM_Y=") + std::to_string(BLOCK_DIM_Y) + " ";
-        try {
-            program.build(build_arguments.c_str());
-        } catch(bc::opencl_error error) {
-            std::cerr << "Build OpenCL source fail at " << __FILE__ << ":" << __LINE__ << std::endl;
-            std::cerr << "Build log is: " << std::endl
-                      << program.build_log() << std::endl;
+        std::string key = "dedisperse_kernel" + std::to_string(NBITS);
+        boost::optional<bc::kernel> m_kernel = kernel_cache.get(key);
+        bc::kernel kernel;
+        if(m_kernel) {
+            kernel = *m_kernel;
+        } else {
+            bc::program program = bc::program::create_with_source(dedisperse_kernel_src, bc::system::default_context());
+            std::string build_arguments = dedisp::type_define_arguments;
+            // macros need to be defined when compile:
+            //     DEDISP_WORD_TYPE, DEDISP_SIZE_TYPE, DEDISP_FLOAT_TYPE, DEDISP_BYTE_TYPE, DEDISP_BOOL_TYPE
+            //     int IN_NBITS, int SAMPS_PER_THREAD, int BLOCK_DIM_X, int BLOCK_DIM_Y
+            build_arguments += std::string("-DIN_NBITS=") + std::to_string(NBITS) + " ";
+            build_arguments += std::string("-DSAMPS_PER_THREAD=") + std::to_string(DEDISP_SAMPS_PER_THREAD) + " ";
+            build_arguments += std::string("-DBLOCK_DIM_X=") + std::to_string(BLOCK_DIM_X) + " ";
+            build_arguments += std::string("-DBLOCK_DIM_Y=") + std::to_string(BLOCK_DIM_Y) + " ";
+            try {
+                program.build(build_arguments.c_str());
+            } catch(bc::opencl_error error) {
+                std::cerr << "Build OpenCL source fail at " << __FILE__ << ":" << __LINE__ << std::endl;
+                std::cerr << "Build log is: " << std::endl
+                          << program.build_log() << std::endl;
+            }
+            kernel = program.create_kernel("dedisperse_kernel");
+            kernel_cache.insert(key, kernel);
         }
-        bc::kernel kernel = program.create_kernel("dedisperse_kernel");
 
         /*
 __kernel void dedisperse_kernel(
