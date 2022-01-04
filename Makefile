@@ -22,7 +22,7 @@ HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
-CPP_FLAGS := -g
+CPP_FLAGS := -g ${SYCL_FLAGS}
 
 LIB_NAME  := libdedisp
 SO_EXT    := .so
@@ -45,7 +45,7 @@ $(SO_NAME): $(SOURCES) $(HEADERS)
 	mkdir -p $(INCLUDE_DIR)
 	mkdir -p $(LIB_DIR)
 	mkdir -p $(OBJ_DIR)
-	$(DPCPP) $(LD_FLAGS) $(CPP_FLAGS) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
+	$(SYCLCC) $(LD_FLAGS) $(CPP_FLAGS) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT).$(MAJOR)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT)
 	cp $(INTERFACE) $(INCLUDE_DIR)

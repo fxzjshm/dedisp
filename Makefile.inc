@@ -10,7 +10,14 @@ THRUST_DIR ?= $(CUDA_DIR)/include
 
 GPU_ARCH   ?= sm_30
 
-ONEAPI_PATH ?= /opt/intel/oneapi
+#SYCLCC     ?= /opt/intel/oneapi/compiler/latest/linux/bin/dpcpp
+#SYCL_FLAGS ?=
+
+SYCLCC     ?= /opt/hipSYCL/bin/syclcc
+SYCL_FLAGS ?= --hipsycl-targets="omp;hip:gfx906"
+
+#SYCLCC     ?= /opt/computecpp/bin/compute++
+#SYCL_FLAGS ?= -sycl-driver -I /opt/computecpp/include/ -L /opt/computecpp/lib/ -lComputeCpp 
 
 LIB_ARCH   = lib64
 
@@ -18,7 +25,6 @@ GCC        = gcc
 GXX        = g++
 AR         = ar
 # NVCC     = $(CUDA_DIR)/bin/nvcc #-Xptxas -abi=no
-DPCPP      = $(ONEAPI_PATH)/compiler/latest/linux/bin/dpcpp
 DOXYGEN    = doxygen
 RM         = rm
 ECHO       = echo
