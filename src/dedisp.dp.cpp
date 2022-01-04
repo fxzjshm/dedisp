@@ -56,7 +56,7 @@ namespace bc = boost::compute;
 #include <iostream>
 using std::cout;
 using std::endl;
-#include "stopwatch.hpp"
+#include "stopwatch.h"
 #endif
 // -----------------------------------------
 
