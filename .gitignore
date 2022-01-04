@@ -2,3 +2,8 @@
 lib/
 include/
 example/testdedisp
+
+src/*.cl.xxd.txt
+
+.vscode/
+.idea/
