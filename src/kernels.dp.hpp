@@ -22,7 +22,7 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <dpct/dpct.hpp>
+#include "util.dp.hpp"
 
 #include <vector> // For generate_dm_list
 #include <cmath>
@@ -364,7 +364,7 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
         // Divide and round up
 	dedisp_size nsamps_reduced = (nsamps - 1) / DEDISP_SAMPS_PER_THREAD + 1;
 
-        sycl::queue *stream = &dpct::dev_mgr::instance().current_device().default_queue();
+        sycl::queue *stream = &dev_mgr::instance().current_device().default_queue();
 		
         // Execute the kernel
 /*
@@ -489,7 +489,7 @@ dedisp_error scrunch_x2(const dedisp_word* d_in,
 	
 
         std::transform(oneapi::dpl::execution::make_device_policy(
-                           dpct::dev_mgr::instance().current_device().default_queue()),
+                           dev_mgr::instance().current_device().default_queue()),
                        dpct::make_counting_iterator<unsigned int>(0),
                        dpct::make_counting_iterator<unsigned int>(out_count),
                        d_out_begin,
@@ -623,7 +623,7 @@ dedisp_error unpack(const dedisp_word* d_transposed,
 	
 
         std::transform(oneapi::dpl::execution::make_device_policy(
-                           dpct::dev_mgr::instance().current_device().default_queue()),
+                           dev_mgr::instance().current_device().default_queue()),
                        dpct::make_counting_iterator<unsigned int>(0),
                        dpct::make_counting_iterator<unsigned int>(out_count),
                        d_unpacked_begin,

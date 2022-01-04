@@ -24,7 +24,7 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <dpct/dpct.hpp>
+#include "util.dp.hpp"
 
 namespace cuda_specs {
 	enum { MAX_GRID_DIMENSION = 65535 };
@@ -203,7 +203,7 @@ void Transpose<T>::transpose(const T* in,
 	if( height > out_stride )
 		return; //throw std::runtime_error("Transpose: height exceeds out_stride");
     if(!stream){
-        stream = &dpct::dev_mgr::instance().current_device().default_queue();
+        stream = &dev_mgr::instance().current_device().default_queue();
     }
 
 	// Specify thread decomposition (uses up-rounded divisions)
