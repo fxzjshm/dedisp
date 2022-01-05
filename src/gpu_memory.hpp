@@ -1,5 +1,3 @@
-#include <CL/sycl.hpp>
-#include <dpct/dpct.hpp>
 /*
  *  Copyright 2012 Ben Barsdell
  *
@@ -20,26 +18,26 @@
   This file just contains crappy wrappers for CUDA memory functions
 */
 
+/*
+  Now this file just contains crappy wrappers for SYCL memory functions
+*/
+
 #pragma once
+
+#include <sycl/sycl.hpp>
+#include "util.dp.hpp"
 
 typedef unsigned int gpu_size_t;
 
-template <typename T> bool malloc_device(T *&addr, gpu_size_t count) try {
-        /*
-        DPCT1003:0: Migrated API does not return error code. (*, 0) is inserted.
-        You may need to rewrite this code.
-        */
-        int error = (addr = (T *)sycl::malloc_device(count * sizeof(T),
-                                                     dpct::get_default_queue()),
-                     0);
-
+template <typename T> bool malloc_device(T *&addr, gpu_size_t count) {
+    try {
+        addr = (T *)sycl::malloc_device(count * sizeof(T), dpct::get_default_queue());
         return true;
+    } catch (sycl::exception const &exc) {
+        return false;
+    }
 }
-catch (sycl::exception const &exc) {
-  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-            << ", line:" << __LINE__ << std::endl;
-  std::exit(1);
-}
+
 template<typename T>
 void free_device(T*& addr) {
         sycl::free(addr, dpct::get_default_queue());

@@ -26,8 +26,10 @@
 
 #include <dedisp.h>
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 // For copying and scrunching the DM list
+#include <sycl/execution_policy>
+#include <sycl/algorithm/fill.hpp>
 
 #include <vector>
 #include <algorithm> // For std::fill
@@ -196,7 +198,7 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
                 throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
-	int device_idx = dev_mgr::instance().current_device_id();
+	int device_idx = dpct::dev_mgr::instance().current_device_id();
 
         // Check for parameter errors
 	if( nchans > DEDISP_MAX_NCHANS ) {
@@ -372,39 +374,16 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
 
 dedisp_error dedisp_set_device(int device_idx) {
 	try {
-        /*
-        DPCT1010:20: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
-
-        /*
-        DPCT1003:21: Migrated API does not return error code. (*, 0) is
-        inserted. You may need to rewrite this code.
-        */
-        int error = (dev_mgr::instance().select_device(device_idx), 0);
-        // Note: cudaErrorInvalidValue isn't a documented return value, but
-	//         it still gets returned :/
+        dpct::dev_mgr::instance().select_device(device_idx);
 #if defined(DEDISP_DEBUG) && DEDISP_DEBUG
-	printf("Currently using device %s\n", dev_mgr::instance().current_device().get_info<cl::sycl::info::device::name>().c_str());
+        printf("Currently using device %s\n", dpct::dev_mgr::instance().current_device().get_info<cl::sycl::info::device::name>().c_str());
 #endif
-        if (101 == error || 1 == error)
-                throw_error(DEDISP_INVALID_DEVICE_INDEX);
-        else if (708 == error)
-                throw_error(DEDISP_DEVICE_ALREADY_SET);
-        else if (0 != error)
-                throw_error(DEDISP_UNKNOWN_ERROR);
-	else
-		return DEDISP_NO_ERROR;
-}
-catch (sycl::exception const &exc) {
-  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-            << ", line:" << __LINE__ << std::endl;
-  std::exit(1);
-}
+        return DEDISP_NO_ERROR;
+    } catch (std::runtime_error exc) {
+        throw_error(DEDISP_INVALID_DEVICE_INDEX);
+    } catch (sycl::exception exc) {
+        throw_error(DEDISP_UNKNOWN_ERROR);
+    }
 }
 
 dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
@@ -429,11 +408,10 @@ dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 	else {
 		// Set the killmask to all true
 		std::fill(plan->killmask.begin(), plan->killmask.end(), (dedisp_bool)true);
-                std::fill(oneapi::dpl::execution::make_device_policy(
-                              dev_mgr::instance().current_device().default_queue()),
+        dpct::dev_mgr::instance().current_device().default_queue().fill(
                           plan->d_killmask.begin(), plan->d_killmask.end(),
                           (dedisp_bool) true);
-        }
+    }
 	return DEDISP_NO_ERROR;
 }
 /*
@@ -501,14 +479,6 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                  unsigned           flags)
 {
 	if( !plan ) { throw_error(DEDISP_INVALID_PLAN); }
-        /*
-        DPCT1010:23: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
 	
 	enum {
 		BITS_PER_BYTE  = 8,
@@ -562,42 +532,22 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	}
 	
 	// Copy the lookup tables to constant memory on the device
-	// TODO: This was much tidier, but thanks to CUDA's insistence on
-	//         breaking its API in v5.0 I had to mess it up like this.
-        /*
-        DPCT1003:24: Migrated API does not return error code. (*, 0) is
-        inserted. You may need to rewrite this code.
-        */
-        (dev_mgr::instance().current_device().default_queue().memcpy(
-             c_delay_table.get_ptr(),
-             dpct::get_raw_pointer(&plan->d_delay_table[0]),
-             plan->nchans * sizeof(dedisp_float)),
-         0);
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:25: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
+    /*
+    dpct::dev_mgr::instance().current_device().default_queue().memcpy(
+         c_delay_table,
+         dpct::get_raw_pointer(&plan->d_delay_table[0]),
+         plan->nchans * sizeof(dedisp_float));
+    dpct::get_current_device().queues_wait_and_throw();
 
-        /*
-        DPCT1003:26: Migrated API does not return error code. (*, 0) is
-        inserted. You may need to rewrite this code.
-        */
-        (dev_mgr::instance().current_device().default_queue().memcpy(
-             c_killmask.get_ptr(), dpct::get_raw_pointer(&plan->d_killmask[0]),
-             plan->nchans * sizeof(dedisp_bool)),
-         0);
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:27: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        error = 0;
+    dpct::dev_mgr::instance().current_device().default_queue().memcpy(
+         c_killmask, dpct::get_raw_pointer(&plan->d_killmask[0]),
+         plan->nchans * sizeof(dedisp_bool));
+    dpct::get_current_device().queues_wait_and_throw();
+    */
+   c_delay_table = dpct::get_raw_pointer(&plan->d_delay_table[0]);
+   c_killmask = dpct::get_raw_pointer(&plan->d_killmask[0]);
 
-        // Compute the problem decomposition
+    // Compute the problem decomposition
 	dedisp_size nsamps_computed = nsamps - plan->max_delay;
 	// Specify the maximum gulp size
 	dedisp_size nsamps_computed_gulp_max;
@@ -643,8 +593,8 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		//         Also check whether the unpacker is broken when in_nbits=32 !
 		min_in_nbits = 16; //32;
 	}
-        dedisp_size unpacked_in_nbits = std::max((int)in_nbits, (int)min_in_nbits);
-        dedisp_size unpacked_chans_per_word =
+    dedisp_size unpacked_in_nbits = std::max((int)in_nbits, (int)min_in_nbits);
+    dedisp_size unpacked_chans_per_word =
 		sizeof(dedisp_word)*BITS_PER_BYTE / unpacked_in_nbits;
 	dedisp_size unpacked_nchan_words = plan->nchans / unpacked_chans_per_word;
 	dedisp_size unpacked_buf_stride_words = unpacked_nchan_words;
@@ -662,11 +612,11 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	dedisp_word*       d_transposed = 0;
 	dedisp_word*       d_unpacked = 0;
 	dedisp_byte*       d_out = 0;
-        dpct::device_vector<dedisp_word> d_in_buf;
-        dpct::device_vector<dedisp_word> d_transposed_buf;
-        dpct::device_vector<dedisp_word> d_unpacked_buf;
-        dpct::device_vector<dedisp_byte> d_out_buf;
-        // Allocate temporary buffers on the device where necessary
+    dpct::device_vector<dedisp_word> d_in_buf;
+    dpct::device_vector<dedisp_word> d_transposed_buf;
+    dpct::device_vector<dedisp_word> d_unpacked_buf;
+    dpct::device_vector<dedisp_byte> d_out_buf;
+    // Allocate temporary buffers on the device where necessary
 	if( using_host_memory || !friendly_in_stride ) {
 		try { d_in_buf.resize(in_count_gulp_max); }
 		catch(...) { throw_error(DEDISP_MEM_ALLOC_FAILED); }
@@ -717,7 +667,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif //  USE_SUBBAND_ALGORITHM
 	
 	// TODO: Eventually re-implement streams
-        sycl::queue *stream = &dpct::get_current_device().default_queue(); //(cudaStream_t)plan->stream;
+    sycl::queue *stream = &dpct::dev_mgr::instance().current_device().default_queue(); //(cudaStream_t)plan->stream;
 
 #ifdef DEDISP_BENCHMARK
 	Stopwatch copy_to_timer;
@@ -907,22 +857,18 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 					// Make a copy of the dm list divided by the scrunch factor
 					// Note: This has the effect of increasing dt in the delay eqn
 					dedisp_size dm_offset = first_dm_idx + scrunch_start;
-                                        std::transform(
-                                            oneapi::dpl::execution::
-                                                make_device_policy(
-                                                    dev_mgr::instance().current_device().default_queue()),
-                                            plan->d_dm_list.begin() + dm_offset,
-                                            plan->d_dm_list.begin() +
-                                                dm_offset + scrunch_count,
-                                            dpct::make_constant_iterator(
-                                                cur_scrunch),
-                                            d_scrunched_dm_list.begin(),
-                                            std::divides<dedisp_float>());
-                                        dedisp_float *d_scrunched_dm_list_ptr =
-                                            dpct::get_raw_pointer(
-                                                &d_scrunched_dm_list[0]);
+                    
+                    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+                    sycl::impl::transform(
+                        execution_policy,
+                        plan->d_dm_list.begin() + dm_offset,
+                        plan->d_dm_list.begin() + dm_offset + scrunch_count,
+                        dpct::make_constant_iterator(cur_scrunch),
+                        d_scrunched_dm_list.begin(),
+                        std::divides<dedisp_float>());
+                    dedisp_float *d_scrunched_dm_list_ptr = dpct::get_raw_pointer(&d_scrunched_dm_list[0]);
 
-                                        // TODO: Is this how the nsamps vars need to change?
+                    // TODO: Is this how the nsamps vars need to change?
 					if( !dedisperse(//&d_transposed[scrunch_offset],
 					                &d_unpacked[scrunch_offset],
 					                nsamps_padded_gulp / cur_scrunch,

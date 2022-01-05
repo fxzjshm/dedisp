@@ -16,12 +16,10 @@
 
 #pragma once
 
-//#include "device_manager.dp.hpp"
-#include "dpct/device.hpp"
+// wrapper of SYCL USM
+// reference: boost/compute/container/vector.hpp
 
-//#include "device_vector.dp.hpp"
-#include "dpct/dpl_extras/vector.h"
+template<typename T>
+class device_vector {
 
-#include "dpct/dpl_extras/iterators.h"
-
-#include <sycl/execution_policy>
+};

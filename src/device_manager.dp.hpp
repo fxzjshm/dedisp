@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // reference: dpct/device.hpp and boost/compute/system.hpp
 
@@ -66,7 +66,7 @@ public:
         device = std::move(device_ext(device_id));
     }
 
-    inline sycl::device& current_device() {
+    inline device_ext& current_device() {
         return device;
     }
 

@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "util.dp.hpp"
 
 namespace cuda_specs {
@@ -203,7 +203,7 @@ void Transpose<T>::transpose(const T* in,
 	if( height > out_stride )
 		return; //throw std::runtime_error("Transpose: height exceeds out_stride");
     if(!stream){
-        stream = &dev_mgr::instance().current_device().default_queue();
+        stream = &dpct::dev_mgr::instance().current_device().default_queue();
     }
 
 	// Specify thread decomposition (uses up-rounded divisions)

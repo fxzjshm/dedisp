@@ -13,7 +13,7 @@ OPTIMISE  := -O3
 # Note: Using -G makes the GPU kernel 16x slower!
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
-INCLUDE   := -I$(SRC_DIR) -I$(THRUST_DIR)
+INCLUDE   := -I$(SRC_DIR)
 # LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
 LIB       := -lstdc++
 
@@ -45,7 +45,7 @@ $(SO_NAME): $(SOURCES) $(HEADERS)
 	mkdir -p $(INCLUDE_DIR)
 	mkdir -p $(LIB_DIR)
 	mkdir -p $(OBJ_DIR)
-	$(SYCLCC) $(LD_FLAGS) $(CPP_FLAGS) -I$(SRC_DIR) -o $(SO_NAME) $(SOURCES) $(LIB)
+	$(SYCLCC) $(LD_FLAGS) $(CPP_FLAGS) $(INCLUDE) -o $(SO_NAME) $(SOURCES) $(LIB)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT).$(MAJOR)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT)
 	cp $(INTERFACE) $(INCLUDE_DIR)
