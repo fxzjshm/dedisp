@@ -14,10 +14,16 @@ GPU_ARCH   ?= sm_30
 #SYCL_FLAGS ?=
 
 SYCLCC     ?= /opt/hipSYCL/bin/syclcc
-SYCL_FLAGS ?= --hipsycl-targets="omp;hip:gfx906"
+SYCL_FLAGS ?= --hipsycl-targets="omp"
 
 #SYCLCC     ?= /opt/computecpp/bin/compute++
-#SYCL_FLAGS ?= -sycl-driver -I /opt/computecpp/include/ -L /opt/computecpp/lib/ -lComputeCpp 
+#SYCL_FLAGS ?= -sycl-driver -I /opt/computecpp/include/ -L /opt/computecpp/lib/ -lComputeCpp -sycl-target spir64
+
+#SYCLCC     ?= clang-12
+#SYCL_FLAGS ?= -I/opt/triSYCL/include -I/opt/mdspan/include -fopenmp -lomp -std=c++17
+
+#SYCLCC     ?= /opt/intel-llvm/bin/clang -fsycl
+#SYCL_FLAGS ?= -lstdc++
 
 LIB_ARCH   = lib64
 
@@ -30,6 +36,6 @@ RM         = rm
 ECHO       = echo
 MKFLAGS    = 
 
-DEDISP_DEBUG = 0
+DEDISP_DEBUG = 1
 
 #.SILENT :

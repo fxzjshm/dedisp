@@ -34,7 +34,7 @@
 #include <sycl/execution_policy>
 #include <sycl/algorithm/transform.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 
 /** class sycl_heterogeneous_execution_policy.
 * @brief Distributes a given workload across two SYCL devices.
@@ -77,31 +77,31 @@ class sycl_heterogeneous_execution_policy
     int q2_elems = std::distance(intermediate1, last1);
 
     if (q1_elems < 1) {
-      auto buf1 = sycl::helpers::make_const_buffer(first1, last1);
-      auto buf2 = sycl::helpers::make_const_buffer(first2, first2 + elements);
-      auto res = sycl::helpers::make_buffer(result, result + elements);
+      auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+      auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, first2 + elements);
+      auto res = sycl_pstl::helpers::make_buffer(result, result + elements);
       impl::transform(named_sep, q2, buf1, buf2, res, binary_op);
       // wait for queues
       q2.wait_and_throw();
     } else if (q2_elems < 1) {
-      auto buf1 = sycl::helpers::make_const_buffer(first1, last1);
-      auto buf2 = sycl::helpers::make_const_buffer(first2, first2 + elements);
-      auto res = sycl::helpers::make_buffer(result, result + elements);
+      auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+      auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, first2 + elements);
+      auto res = sycl_pstl::helpers::make_buffer(result, result + elements);
       impl::transform(named_sep, q1, buf1, buf2, res, binary_op);
       // wait for queues
       q1.wait_and_throw();
     } else {
       auto buf1_q1 =
-          sycl::helpers::make_const_buffer(first1, first1 + crosspoint);
+          sycl_pstl::helpers::make_const_buffer(first1, first1 + crosspoint);
       auto buf2_q1 =
-          sycl::helpers::make_const_buffer(first2, first2 + crosspoint);
-      auto res_q1 = sycl::helpers::make_buffer(result, result + crosspoint);
+          sycl_pstl::helpers::make_const_buffer(first2, first2 + crosspoint);
+      auto res_q1 = sycl_pstl::helpers::make_buffer(result, result + crosspoint);
       auto buf1_q2 =
-          sycl::helpers::make_const_buffer(first1 + crosspoint, last1);
-      auto buf2_q2 = sycl::helpers::make_const_buffer(first2 + crosspoint,
+          sycl_pstl::helpers::make_const_buffer(first1 + crosspoint, last1);
+      auto buf2_q2 = sycl_pstl::helpers::make_const_buffer(first2 + crosspoint,
                                                       first2 + elements);
       auto res_q2 =
-          sycl::helpers::make_buffer(result + crosspoint, result + elements);
+          sycl_pstl::helpers::make_buffer(result + crosspoint, result + elements);
       impl::transform(named_sep, q1, buf1_q1, buf2_q1, res_q1, binary_op);
       impl::transform(named_sep, q2, buf1_q2, buf2_q2, res_q2, binary_op);
       // wait for queues

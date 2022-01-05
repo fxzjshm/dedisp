@@ -373,6 +373,8 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
 #define DEDISP_CALL_KERNEL(NBITS) \
         stream->submit( \
             [&](sycl::handler &cgh) { \
+                dedisp_float* const c_delay_table_ct1 = c_delay_table; \
+                dedisp_bool* const c_killmask_ct2 = c_killmask; \
                 cgh.parallel_for( \
                     sycl::nd_range<3>(grid * block, block),  \
                     [=](sycl::nd_item<3> item) { \
@@ -381,7 +383,7 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
                         dm_count, dm_stride, ndm_blocks, nchans, chan_stride,  \
                         d_out, out_nbits, out_stride, d_dm_list, batch_in_stride,  \
                         batch_dm_stride, batch_chan_stride, batch_out_stride, item,  \
-                        c_delay_table, c_killmask); \
+                        c_delay_table_ct1, c_killmask_ct2); \
                     } \
                 ); \
             } \
@@ -458,8 +460,8 @@ dedisp_error scrunch_x2(const dedisp_word* d_in,
         dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 
-    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
-    sycl::impl::transform(execution_policy,
+    auto execution_policy = ::sycl_pstl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+    sycl_pstl::impl::transform(execution_policy,
                    boost::make_counting_iterator<unsigned int>(0),
                    boost::make_counting_iterator<unsigned int>(out_count),
                    d_out_begin,
@@ -590,8 +592,8 @@ dedisp_error unpack(const dedisp_word* d_transposed,
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 	
-    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
-    sycl::impl::transform(execution_policy,
+    auto execution_policy = ::sycl_pstl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+    sycl_pstl::impl::transform(execution_policy,
                        boost::make_counting_iterator<unsigned int>(0),
                        boost::make_counting_iterator<unsigned int>(out_count),
                        d_unpacked_begin,

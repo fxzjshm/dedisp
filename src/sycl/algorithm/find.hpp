@@ -40,7 +40,7 @@
 #include <sycl/helpers/sycl_buffers.hpp>
 #include <sycl/helpers/sycl_namegen.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 #ifdef SYCL_PSTL_USE_OLD_ALGO
@@ -55,12 +55,12 @@ InputIt find_impl(ExecutionPolicy &sep, InputIt b, InputIt e,
   const auto device = q.get_device();
 
   // make a buffer that doesn't trigger a copy back, as we don't modify it
-  auto buf = sycl::helpers::make_const_buffer(b, e);
+  auto buf = sycl_pstl::helpers::make_const_buffer(b, e);
 
   const auto vectorSize = buf.get_count();
 
   // construct a buffer to store the result of the predicate mapping stage
-  auto t_buf = sycl::helpers::make_temp_buffer<std::size_t>(vectorSize);
+  auto t_buf = sycl_pstl::helpers::make_temp_buffer<std::size_t>(vectorSize);
 
   if (vectorSize < 1) {
     return e;
@@ -137,7 +137,7 @@ InputIt find_impl(ExecutionPolicy &sep, InputIt b, InputIt e,
 template <typename ExecutionPolicy, typename InputIt, typename UnaryPredicate>
 InputIt find_impl(ExecutionPolicy &snp, InputIt b, InputIt e,
                   UnaryPredicate p) {
-  const auto size = sycl::helpers::distance(b, e);
+  const auto size = sycl_pstl::helpers::distance(b, e);
   if (size <= 0) {
     return e;
   }
@@ -149,7 +149,7 @@ InputIt find_impl(ExecutionPolicy &snp, InputIt b, InputIt e,
   const auto d =
       compute_mapreduce_descriptor(device, size, sizeof(std::size_t));
 
-  const auto input_buff = sycl::helpers::make_const_buffer(b, e);
+  const auto input_buff = sycl_pstl::helpers::make_const_buffer(b, e);
 
   const auto pos = buffer_mapreduce(
       snp, q, input_buff, size, d,

@@ -41,7 +41,7 @@
 
 #include <CL/sycl.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace helpers {
 
 template <typename T, cl::sycl::access::mode Mode>

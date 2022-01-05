@@ -39,7 +39,7 @@
 #include <sycl/algorithm/algorithm_composite_patterns.hpp>
 #include <sycl/algorithm/buffer_algorithms.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 #ifdef SYCL_PSTL_USE_OLD_ALGO
@@ -55,7 +55,7 @@ typename std::iterator_traits<InputIterator>::difference_type count_if(
     ExecutionPolicy& exec, InputIterator first, InputIterator last,
     UnaryOperation unary_op, BinaryOperation binary_op) {
   cl::sycl::queue q(exec.get_queue());
-  auto vectorSize = sycl::helpers::distance(first, last);
+  auto vectorSize = sycl_pstl::helpers::distance(first, last);
   typename std::iterator_traits<InputIterator>::difference_type ret = 0;
 
   if (vectorSize < 1) {
@@ -63,7 +63,7 @@ typename std::iterator_traits<InputIterator>::difference_type count_if(
   }
 
   auto device = q.get_device();
-  auto bufI = sycl::helpers::make_const_buffer(first, last);
+  auto bufI = sycl_pstl::helpers::make_const_buffer(first, last);
   cl::sycl::buffer<int, 1> bufR((cl::sycl::range<1>(vectorSize)));
   auto length = vectorSize;
   auto ndRange = exec.calculateNdRange(vectorSize);
@@ -78,7 +78,7 @@ typename std::iterator_traits<InputIterator>::difference_type count_if(
                        cl::sycl::access::target::local>
         scratch(ndRange.get_local_range(), h);
 
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [aI, aR, scratch, passes, local, length, unary_op, binary_op](
                cl::sycl::nd_item<1> id) {
           auto r = ReductionStrategy<int>(local, length, id, scratch);
@@ -113,7 +113,7 @@ typename std::iterator_traits<InputIt>::difference_type count_if(
 
 
   auto q = snp.get_queue();
-  auto size = sycl::helpers::distance(b, e);
+  auto size = sycl_pstl::helpers::distance(b, e);
   if(size <= 0) return 0;
 
   auto device = q.get_device();
@@ -122,7 +122,7 @@ typename std::iterator_traits<InputIt>::difference_type count_if(
 
   auto d = compute_mapreduce_descriptor(device, size, sizeof(size_t));
 
-  auto input_buff = sycl::helpers::make_const_buffer(b, e);
+  auto input_buff = sycl_pstl::helpers::make_const_buffer(b, e);
 
   auto map = [=](size_t pos, value_type x) {
     return (unary_op(x)) ? 1 : 0;

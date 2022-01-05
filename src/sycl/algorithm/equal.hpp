@@ -40,7 +40,7 @@
 #include <sycl/helpers/sycl_buffers.hpp>
 #include <sycl/helpers/sycl_differences.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 #ifdef SYCL_PSTL_USE_OLD_ALGO
@@ -54,8 +54,8 @@ bool equal(ExecutionPolicy& exec, ForwardIt1 first1, ForwardIt1 last1,
            ForwardIt2 first2, ForwardIt2 last2, BinaryPredicate p) {
   cl::sycl::queue q(exec.get_queue());
 
-  auto size1 = sycl::helpers::distance(first1, last1);
-  auto size2 = sycl::helpers::distance(first2, last2);
+  auto size1 = sycl_pstl::helpers::distance(first1, last1);
+  auto size2 = sycl_pstl::helpers::distance(first2, last2);
 
   if (size1 != size2) {
     return false;
@@ -71,8 +71,8 @@ bool equal(ExecutionPolicy& exec, ForwardIt1 first1, ForwardIt1 last1,
   auto ndRange = exec.calculateNdRange(size1);
   const auto local = ndRange.get_local_range()[0];
 
-  auto buf1 = sycl::helpers::make_const_buffer(first1, last1);
-  auto buf2 = sycl::helpers::make_const_buffer(first2, last2);
+  auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+  auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, last2);
   auto bufR = cl::sycl::buffer<bool, 1>(cl::sycl::range<1>(size1));
 
   do {
@@ -87,7 +87,7 @@ bool equal(ExecutionPolicy& exec, ForwardIt1 first1, ForwardIt1 last1,
                          cl::sycl::access::target::local>
           scratch(ndRange.get_local_range(), h);
 
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [a1, a2, aR, scratch, passes, local, length,
               p](cl::sycl::nd_item<1> id) {
             auto r =
@@ -121,8 +121,8 @@ template <class ExecutionPolicy, class ForwardIt1, class ForwardIt2,
 bool equal(ExecutionPolicy&& exec, ForwardIt1 first1, ForwardIt1 last1,
            ForwardIt2 first2, ForwardIt2 last2, BinaryPredicate p) {
   auto q = exec.get_queue();
-  auto size1 = sycl::helpers::distance(first1, last1);
-  auto size2 = sycl::helpers::distance(first2, last2);
+  auto size1 = sycl_pstl::helpers::distance(first1, last1);
+  auto size2 = sycl_pstl::helpers::distance(first2, last2);
 
   if (size1 != size2) {
     return false;
@@ -138,8 +138,8 @@ bool equal(ExecutionPolicy&& exec, ForwardIt1 first1, ForwardIt1 last1,
 
   auto d = compute_mapreduce_descriptor(device, size1, sizeof(std::size_t));
 
-  auto input_buff1 = sycl::helpers::make_const_buffer(first1, last1);
-  auto input_buff2 = sycl::helpers::make_const_buffer(first2, last2);
+  auto input_buff1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+  auto input_buff2 = sycl_pstl::helpers::make_const_buffer(first2, last2);
 
   return buffer_map2reduce(
       exec, q, input_buff1, input_buff2, true, d,

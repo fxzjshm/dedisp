@@ -31,7 +31,7 @@
 
 #include <algorithm>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace helpers {
 
 template<class T>

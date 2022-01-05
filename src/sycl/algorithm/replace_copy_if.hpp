@@ -36,7 +36,7 @@
 // SYCL helpers header
 #include <sycl/helpers/sycl_buffers.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* replace_copy_if.
@@ -53,7 +53,7 @@ ForwardIt2 replace_copy_if(ExecutionPolicy &sep, ForwardIt1 first,
   auto bufI = helpers::make_buffer(first, last);
 
   const auto d_last(d_first + bufI.get_count());
-  auto bufO = sycl::helpers::make_buffer(d_first, d_last);
+  auto bufO = sycl_pstl::helpers::make_buffer(d_first, d_last);
 
   // copy new_value, as we cannot capture it by reference
   const T new_val = new_value;
@@ -66,7 +66,7 @@ ForwardIt2 replace_copy_if(ExecutionPolicy &sep, ForwardIt1 first,
 
     const auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
     const auto aO = bufO.template get_access<cl::sycl::access::mode::write>(h);
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [aI, aO, vectorSize, p, new_val](cl::sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           const auto orig_value = aI[global_id];

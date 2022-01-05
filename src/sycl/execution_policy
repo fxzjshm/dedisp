@@ -67,7 +67,7 @@
 #include <sycl/algorithm/equal.hpp>
 #include <sycl/algorithm/mismatch.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 
 /** DefaultKernelName
 * Empty type uses when a kernel name is not required
@@ -134,7 +134,7 @@ class sycl_execution_policy {
   typename std::iterator_traits<InputIterator>::value_type reduce(
       InputIterator first, InputIterator last) {
     typedef typename std::iterator_traits<InputIterator>::value_type type_;
-    return sycl::impl::reduce(*this, first, last, type_(0),
+    return sycl_pstl::impl::reduce(*this, first, last, type_(0),
                               [=](type_ v1, type_ v2) { return v1 + v2; });
   }
 
@@ -147,7 +147,7 @@ class sycl_execution_policy {
    */
   template <class InputIterator, class T>
   T reduce(InputIterator first, InputIterator last, T init) {
-    return sycl::impl::reduce(*this, first, last, init,
+    return sycl_pstl::impl::reduce(*this, first, last, init,
                               [=](T v1, T v2) { return v1 + v2; });
   }
 
@@ -162,7 +162,7 @@ class sycl_execution_policy {
   template <class InputIterator, class T, class BinaryOperation>
   T reduce(InputIterator first, InputIterator last, T init,
            BinaryOperation binop) {
-    return sycl::impl::reduce(*this, first, last, init, binop);
+    return sycl_pstl::impl::reduce(*this, first, last, init, binop);
   }
 
   /** sort
@@ -175,13 +175,13 @@ class sycl_execution_policy {
     cl::sycl::queue q(get_queue());
     typedef
         typename std::iterator_traits<RandomAccessIterator>::value_type type_;
-    auto buf = std::move(sycl::helpers::make_buffer(b, e));
+    auto buf = std::move(sycl_pstl::helpers::make_buffer(b, e));
     auto vectorSize = buf.get_count();
 
     if (impl::isPowerOfTwo(vectorSize)) {
-      sycl::impl::bitonic_sort<type_>(q, buf, vectorSize);
+      sycl_pstl::impl::bitonic_sort<type_>(q, buf, vectorSize);
     } else {
-      sycl::impl::sequential_sort<type_>(q, buf, vectorSize);
+      sycl_pstl::impl::sequential_sort<type_>(q, buf, vectorSize);
     }
   }
 

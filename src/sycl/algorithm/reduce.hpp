@@ -41,7 +41,7 @@
 #include <sycl/algorithm/buffer_algorithms.hpp>
 #include <sycl/execution_policy>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* reduce.
@@ -59,7 +59,7 @@ typename std::iterator_traits<Iterator>::value_type reduce(
     ExecutionPolicy &sep, Iterator b, Iterator e, T init, BinaryOperation bop) {
   cl::sycl::queue q(sep.get_queue());
 
-  auto vectorSize = sycl::helpers::distance(b, e);
+  auto vectorSize = sycl_pstl::helpers::distance(b, e);
 
   if (vectorSize < 1) {
     return init;
@@ -68,7 +68,7 @@ typename std::iterator_traits<Iterator>::value_type reduce(
   auto device = q.get_device();
 
   typedef typename std::iterator_traits<Iterator>::value_type type_;
-  auto bufI = sycl::helpers::make_const_buffer(b, e);
+  auto bufI = sycl_pstl::helpers::make_const_buffer(b, e);
   auto length = vectorSize;
   auto ndRange = sep.calculateNdRange(length);
   const auto local = ndRange.get_local_range()[0];
@@ -79,7 +79,7 @@ typename std::iterator_traits<Iterator>::value_type reduce(
                        cl::sycl::access::target::local>
         scratch(ndRange.get_local_range(), h);
 
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [aI, scratch, local, length, bop](cl::sycl::nd_item<1> id) {
           auto r = ReductionStrategy<T>(local, length, id, scratch);
           r.workitem_get_from(aI);
@@ -112,7 +112,7 @@ typename std::iterator_traits<Iterator>::value_type reduce(
 
   auto q = snp.get_queue();
   auto device = q.get_device();
-  auto size = sycl::helpers::distance(b, e);
+  auto size = sycl_pstl::helpers::distance(b, e);
   using value_type = typename std::iterator_traits<Iterator>::value_type;
 
   if (size <= 0)
@@ -120,7 +120,7 @@ typename std::iterator_traits<Iterator>::value_type reduce(
 
   auto d = compute_mapreduce_descriptor(device, size, sizeof(value_type));
 
-  auto input_buff = sycl::helpers::make_const_buffer(b, e);
+  auto input_buff = sycl_pstl::helpers::make_const_buffer(b, e);
 
   auto map = [](size_t, value_type x) { return x; };
 

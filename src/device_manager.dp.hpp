@@ -20,8 +20,6 @@
 
 // reference: dpct/device.hpp and boost/compute/system.hpp
 
-namespace sycl = cl::sycl;
-
 class device_ext {
 public:
     device_ext(size_t device_id_) : device_id(device_id_) {

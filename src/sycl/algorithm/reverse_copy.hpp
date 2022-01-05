@@ -36,7 +36,7 @@
 // SYCL helpers header
 #include <sycl/helpers/sycl_buffers.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* reverse_copy.
@@ -51,7 +51,7 @@ ForwardIt reverse_copy(ExecutionPolicy &sep, BidirIt first, BidirIt last,
 
   auto bufI = helpers::make_buffer(first, last);
   const auto d_last(d_first + bufI.get_count());
-  auto bufO = sycl::helpers::make_buffer(d_first, d_last);
+  auto bufO = sycl_pstl::helpers::make_buffer(d_first, d_last);
 
   const auto vectorSize = bufI.get_count();
   const auto ndRange = sep.calculateNdRange(vectorSize);
@@ -59,7 +59,7 @@ ForwardIt reverse_copy(ExecutionPolicy &sep, BidirIt first, BidirIt last,
             &bufO](cl::sycl::handler &h) mutable {
     const auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
     const auto aO = bufO.template get_access<cl::sycl::access::mode::write>(h);
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [aI, aO, vectorSize](cl::sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           if (global_id < vectorSize) {

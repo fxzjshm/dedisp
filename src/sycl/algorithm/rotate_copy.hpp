@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* rotate_copy.

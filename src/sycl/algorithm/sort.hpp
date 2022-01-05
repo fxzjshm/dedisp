@@ -125,7 +125,7 @@ class sort_kernel_sequential_comp {
   }
 };  // class sort_kernel
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* Aliases for SYCL accessors */
@@ -314,18 +314,18 @@ template <class ExecutionPolicy, class RandomIt, class CompareOp>
 void sort(ExecutionPolicy &sep, RandomIt first, RandomIt last, CompareOp comp) {
   cl::sycl::queue q(sep.get_queue());
   typedef typename std::iterator_traits<RandomIt>::value_type type_;
-  auto buf = std::move(sycl::helpers::make_buffer(first, last));
+  auto buf = std::move(sycl_pstl::helpers::make_buffer(first, last));
   auto vectorSize = buf.get_count();
 
   typedef typename buffer_traits<decltype(buf)>::allocator_type allocator_;
   
   if (impl::isPowerOfTwo(vectorSize)) {
-    sycl::impl::bitonic_sort<
+    sycl_pstl::impl::bitonic_sort<
         type_, allocator_, CompareOp,
         bitonic_sort_name<typename ExecutionPolicy::kernelName>>(
         q, buf, vectorSize, comp);
   } else {
-    sycl::impl::sequential_sort<
+    sycl_pstl::impl::sequential_sort<
         type_, allocator_, CompareOp,
         sequential_sort_name<typename ExecutionPolicy::kernelName>>(
         q, buf, vectorSize, comp);

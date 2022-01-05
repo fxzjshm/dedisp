@@ -38,7 +38,7 @@
 #include <sycl/helpers/sycl_differences.hpp>
 #include <sycl/helpers/sycl_namegen.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* mismatch.
@@ -54,8 +54,8 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
                                            ForwardIt2 first2, ForwardIt2 last2,
                                            BinaryPredicate p) {
   cl::sycl::queue q(exec.get_queue());
-  const auto size1 = sycl::helpers::distance(first1, last1);
-  const auto size2 = sycl::helpers::distance(first2, last2);
+  const auto size1 = sycl_pstl::helpers::distance(first1, last1);
+  const auto size2 = sycl_pstl::helpers::distance(first2, last2);
 
   if (size1 < 1 || size2 < 1) {
     return std::make_pair(first1, first2);
@@ -67,8 +67,8 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
   auto ndRange = exec.calculateNdRange(length);
   const auto local = ndRange.get_local_range()[0];
 
-  auto buf1 = sycl::helpers::make_const_buffer(first1, first1 + length);
-  auto buf2 = sycl::helpers::make_const_buffer(first2, first2 + length);
+  auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, first1 + length);
+  auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, first2 + length);
 
   cl::sycl::buffer<std::size_t, 1> bufR((cl::sycl::range<1>(size1)));
 
@@ -101,7 +101,7 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
                        cl::sycl::access::target::local>
         scratch(ndRange.get_local_range(), h);
 
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [aR, scratch, passes, local,
             current_length](cl::sycl::nd_item<1> id) {
           auto r = ReductionStrategy<std::size_t>(local, current_length, id,
@@ -136,8 +136,8 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
                                            ForwardIt1 first1, ForwardIt1 last1,
                                            ForwardIt2 first2, ForwardIt2 last2,
                                            BinaryPredicate p) {
-  const auto size1 = sycl::helpers::distance(first1, last1);
-  const auto size2 = sycl::helpers::distance(first2, last2);
+  const auto size1 = sycl_pstl::helpers::distance(first1, last1);
+  const auto size2 = sycl_pstl::helpers::distance(first2, last2);
 
   if (size1 <= 0 || size2 <= 0) {
     return std::make_pair(first1, first2);
@@ -155,9 +155,9 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
       compute_mapreduce_descriptor(device, length, sizeof(value_type1));
 
   const auto input_buff1 =
-      sycl::helpers::make_const_buffer(first1, first1 + length);
+      sycl_pstl::helpers::make_const_buffer(first1, first1 + length);
   const auto input_buff2 =
-      sycl::helpers::make_const_buffer(first2, first2 + length);
+      sycl_pstl::helpers::make_const_buffer(first2, first2 + length);
 
   const auto pos = buffer_map2reduce(
       exec, q, input_buff1, input_buff2, length, d,

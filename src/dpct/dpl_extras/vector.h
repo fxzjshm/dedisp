@@ -66,7 +66,7 @@ private:
 public:
   template <typename OtherA> operator const std::vector<T, OtherA>() & {
     auto __tmp = std::vector<T, OtherA>(this->size());
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               this->begin(), this->end(), __tmp.begin());
     return __tmp;
   }
@@ -83,14 +83,14 @@ public:
       : _alloc(get_default_queue()), _size(n) {
     _capacity = 2 * _size;
     _storage = _alloc.allocate(_capacity);
-    std::fill(::sycl::sycl_execution_policy(get_default_queue()),
+    std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
               begin(), end(), T(value));
   }
   device_vector(const device_vector &other) : _alloc(get_default_queue()) {
     _size = other.size();
     _capacity = other.capacity();
     _storage = _alloc.allocate(_capacity);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               other.begin(), other.end(), begin());
   }
   device_vector(device_vector &&other)
@@ -110,7 +110,7 @@ public:
     _size = std::distance(first, last);
     _capacity = 2 * _size;
     _storage = _alloc.allocate(_capacity);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               first, last, begin());
   }
 
@@ -122,7 +122,7 @@ public:
     _size = std::distance(first, last);
     _capacity = 2 * _size;
     _storage = _alloc.allocate(_capacity);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
                 first, last, begin());
   }
 
@@ -139,7 +139,7 @@ public:
     _capacity = 2 * _size;
     _storage = _alloc.allocate(_capacity);
     std::vector<T> _tmp(first, last);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               _tmp.begin(), _tmp.end(), this->begin());
   }
 
@@ -153,21 +153,21 @@ public:
       : _alloc(get_default_queue()), _size(v.size()) {
     _capacity = 2 * _size;
     _storage = _alloc.allocate(_capacity);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               v.begin(), v.end(), this->begin());
   }
 
   template <typename OtherAllocator>
   device_vector &operator=(const std::vector<T, OtherAllocator> &v) {
     resize(v.size());
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               v.begin(), v.end(), begin());
     return *this;
   }
   device_vector &operator=(const device_vector &other) {
     // Copy assignment operator:
     resize(other.size());
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               other.begin(), other.end(), begin());
     return *this;
   }
@@ -203,7 +203,7 @@ public:
       // allocate buffer for new size
       auto tmp = _alloc.allocate(2 * n);
       // copy content (old buffer to new buffer)
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 begin(), end(), tmp);
       // deallocate old memory
       _alloc.deallocate(_storage, _capacity);
@@ -228,7 +228,7 @@ public:
   void shrink_to_fit(void) {
     if (_size != capacity()) {
       auto tmp = _alloc.allocate(_size);
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 begin(), end(), tmp);
       _alloc.deallocate(_storage, _capacity);
       _storage = tmp;
@@ -237,7 +237,7 @@ public:
   }
   void assign(size_type n, const T &x) {
     resize(n);
-    std::fill(::sycl::sycl_execution_policy(get_default_queue()),
+    std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
               begin(), begin() + n, x);
   }
   template <typename InputIterator>
@@ -247,7 +247,7 @@ public:
                                  InputIterator>::type last) {
     auto n = std::distance(first, last);
     resize(n);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               first, last, begin());
   }
   void clear(void) { _size = 0; }
@@ -266,10 +266,10 @@ public:
     auto m = std::distance(last, end());
     auto tmp = _alloc.allocate(m);
     // copy remainder to temporary buffer.
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               last, end(), tmp);
     // override (erase) subsequence in storage.
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               tmp, tmp + m, first);
     _alloc.deallocate(tmp, m);
     _size -= n;
@@ -284,7 +284,7 @@ public:
   void insert(iterator position, size_type n, const T &x) {
     if (position == end()) {
       resize(size() + n);
-      std::fill(::sycl::sycl_execution_policy(get_default_queue()),
+      std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
                 end() - n, end(), x);
     } else {
       auto i_n = std::distance(begin(), position);
@@ -292,17 +292,17 @@ public:
       auto m = std::distance(position, end());
       auto tmp = _alloc.allocate(m);
       // copy remainder
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 position, end(), tmp);
 
       resize(size() + n);
       // resizing might invalidate position
       position = begin() + position.get_idx();
 
-      std::fill(::sycl::sycl_execution_policy(get_default_queue()),
+      std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
                 position, position + n, x);
 
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 tmp, tmp + m, position + n);
       _alloc.deallocate(tmp, m);
     }
@@ -315,22 +315,22 @@ public:
     auto n = std::distance(first, last);
     if (position == end()) {
       resize(size() + n);
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 first, last, end());
     } else {
       auto m = std::distance(position, end());
       auto tmp = _alloc.allocate(m);
 
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 position, end(), tmp);
 
       resize(size() + n);
       // resizing might invalidate position
       position = begin() + position.get_idx();
 
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 first, last, position);
-      std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+      dpct::copy(
                 tmp, tmp + m, position + n);
       _alloc.deallocate(tmp, m);
     }
@@ -409,7 +409,7 @@ public:
         _size(std::distance(first, last)) {
     auto buf = get_buffer();
     auto dst = oneapi::dpl::begin(buf);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               first, last, dst);
   }
 
@@ -424,7 +424,7 @@ public:
     auto start = oneapi::dpl::begin(tmp_buf);
     auto end = oneapi::dpl::end(tmp_buf);
     auto dst = oneapi::dpl::begin(buf);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               start, end, dst);
   }
 
@@ -444,7 +444,7 @@ public:
     auto start = oneapi::dpl::begin(tmp_buf);
     auto end = oneapi::dpl::end(tmp_buf);
     auto dst = oneapi::dpl::begin(buf);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               start, end, dst);
   }
 
@@ -453,7 +453,7 @@ public:
       : _storage(alloc_store(v.size() * sizeof(T))), _size(v.size()) {
     auto buf = get_buffer();
     auto dst = oneapi::dpl::begin(buf);
-    std::copy(::sycl::sycl_execution_policy(get_default_queue()),
+    dpct::copy(
               v.real_begin(), v.real_begin() + v.size(), dst);
   }
 

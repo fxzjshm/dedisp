@@ -38,7 +38,7 @@
 #include <sycl/helpers/sycl_differences.hpp>
 #include <sycl/algorithm/algorithm_composite_patterns.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* transform_reduce.
@@ -56,7 +56,7 @@ T transform_reduce(ExecutionPolicy& exec, InputIterator first,
                    InputIterator last, UnaryOperation unary_op, T init,
                    BinaryOperation binary_op) {
   cl::sycl::queue q(exec.get_queue());
-  auto vectorSize = sycl::helpers::distance(first, last);
+  auto vectorSize = sycl_pstl::helpers::distance(first, last);
   
   if (vectorSize < 1) {
     return init;
@@ -65,7 +65,7 @@ T transform_reduce(ExecutionPolicy& exec, InputIterator first,
   cl::sycl::buffer<T, 1> bufR((cl::sycl::range<1>(vectorSize)));
 
   auto device = q.get_device();
-  auto bufI = sycl::helpers::make_const_buffer(first, last);
+  auto bufI = sycl_pstl::helpers::make_const_buffer(first, last);
   size_t length = vectorSize;
   auto ndRange = exec.calculateNdRange(vectorSize);
   const auto local = ndRange.get_local_range()[0];
@@ -80,7 +80,7 @@ T transform_reduce(ExecutionPolicy& exec, InputIterator first,
                          cl::sycl::access::target::local>
           scratch(ndRange.get_local_range(), h);
 
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [aI, aR, scratch, passes, local, length, unary_op, binary_op](
                  cl::sycl::nd_item<1> id) {
             auto r = ReductionStrategy<T>(local, length, id, scratch);
@@ -112,7 +112,7 @@ T transform_reduce(ExecutionPolicy& snp, InputIt b,
                    InputIt e, UnaryOperation unary_op, T init,
                    BinaryOperation binary_op) {
 
-  auto size = sycl::helpers::distance(b, e);
+  auto size = sycl_pstl::helpers::distance(b, e);
   if (size <= 0)
     return init;
 
@@ -124,7 +124,7 @@ T transform_reduce(ExecutionPolicy& snp, InputIt b,
 
   auto d = compute_mapreduce_descriptor(device, size, sizeof(value_type));
 
-  auto input_buff = sycl::helpers::make_const_buffer(b, e);
+  auto input_buff = sycl_pstl::helpers::make_const_buffer(b, e);
 
   auto map = [=](size_t pos, value_type x) { return unary_op(x); };
 

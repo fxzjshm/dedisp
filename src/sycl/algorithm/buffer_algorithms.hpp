@@ -34,7 +34,7 @@
 
 #include <cassert>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 
@@ -375,7 +375,7 @@ void buffer_mapscan(ExecutionPolicy &snp,
   using std::max;
 
   //WARNING: nb_work_group is not bounded by max_compute_units
-  auto scan = sycl::helpers::make_temp_buffer<B>( d.nb_work_group );
+  auto scan = sycl_pstl::helpers::make_temp_buffer<B>( d.nb_work_group );
   //cl::sycl::buffer<B, 1> scan = { cl::sycl::range<1> { d.nb_work_group } };
   cl::sycl::range<1> rng_wg {d.nb_work_group * d.nb_work_item};
   cl::sycl::range<1> rng_wi {d.nb_work_item};

@@ -36,7 +36,7 @@
 // SYCL helpers header
 #include <sycl/helpers/sycl_buffers.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* for_each_n.
@@ -57,13 +57,13 @@ InputIterator for_each_n(ExecutionPolicy &exec, InputIterator first, Size n,
   if (n > 0) {
     auto last(first + n);
     auto device = q.get_device();
-    auto bufI = sycl::helpers::make_buffer(first, last);
+    auto bufI = sycl_pstl::helpers::make_buffer(first, last);
     auto vectorSize = bufI.get_count();
     const auto ndRange = exec.calculateNdRange(vectorSize);
     auto cg = [vectorSize, ndRange, &bufI, f](
         cl::sycl::handler &h) mutable {
       auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [vectorSize, aI, f](cl::sycl::nd_item<1> id) {
             if (id.get_global_id(0) < vectorSize) {
               f(aI[id.get_global_id(0)]);

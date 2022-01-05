@@ -33,7 +33,7 @@
 #include <sycl/helpers/sycl_namegen.hpp>
 #include <sycl/algorithm/buffer_algorithms.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 #ifdef SYCL_PSTL_USE_OLD_ALGO
@@ -50,11 +50,11 @@ OutputIterator exclusive_scan(ExecutionPolicy &sep, InputIterator b,
   auto q = sep.get_queue();
   auto device = q.get_device();
 
-  auto bufI = sycl::helpers::make_const_buffer(b, e);
+  auto bufI = sycl_pstl::helpers::make_const_buffer(b, e);
 
   auto vectorSize = bufI.get_count();
   // declare a temporary "swap" buffer
-  auto bufO = sycl::helpers::make_buffer(o, o + vectorSize);
+  auto bufO = sycl_pstl::helpers::make_buffer(o, o + vectorSize);
 
   const auto ndRange = sep.calculateNdRange(vectorSize);
   // calculate iteration count, with extra if not a power of two size buffer
@@ -137,7 +137,7 @@ OutputIterator exclusive_scan(ExecutionPolicy &snp, InputIterator b,
 
   cl::sycl::queue q(snp.get_queue());
   auto device = q.get_device();
-  auto size = sycl::helpers::distance(b, e);
+  auto size = sycl_pstl::helpers::distance(b, e);
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
 #ifdef TRISYCL_CL_LANGUAGE_VERSION
   std::vector<value_type> vect { b, e };

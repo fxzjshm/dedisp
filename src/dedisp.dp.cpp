@@ -376,7 +376,7 @@ dedisp_error dedisp_set_device(int device_idx) {
 	try {
         dpct::dev_mgr::instance().select_device(device_idx);
 #if defined(DEDISP_DEBUG) && DEDISP_DEBUG
-        printf("Currently using device %s\n", dpct::dev_mgr::instance().current_device().get_info<cl::sycl::info::device::name>().c_str());
+        printf("Currently using device %s\n", dpct::dev_mgr::instance().current_device().get_info<sycl::info::device::name>().c_str());
 #endif
         return DEDISP_NO_ERROR;
     } catch (std::runtime_error exc) {
@@ -409,8 +409,8 @@ dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 		// Set the killmask to all true
 		std::fill(plan->killmask.begin(), plan->killmask.end(), (dedisp_bool)true);
         dpct::dev_mgr::instance().current_device().default_queue().fill(
-                          plan->d_killmask.begin(), plan->d_killmask.end(),
-                          (dedisp_bool) true);
+                          dpct::get_raw_pointer(plan->d_killmask.begin()),
+                          (dedisp_bool) true, plan->d_killmask.size());
     }
 	return DEDISP_NO_ERROR;
 }
@@ -544,8 +544,8 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
          plan->nchans * sizeof(dedisp_bool));
     dpct::get_current_device().queues_wait_and_throw();
     */
-   c_delay_table = dpct::get_raw_pointer(&plan->d_delay_table[0]);
-   c_killmask = dpct::get_raw_pointer(&plan->d_killmask[0]);
+    c_delay_table = dpct::get_raw_pointer(&plan->d_delay_table[0]);
+    c_killmask = dpct::get_raw_pointer(&plan->d_killmask[0]);
 
     // Compute the problem decomposition
 	dedisp_size nsamps_computed = nsamps - plan->max_delay;
@@ -858,8 +858,8 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 					// Note: This has the effect of increasing dt in the delay eqn
 					dedisp_size dm_offset = first_dm_idx + scrunch_start;
                     
-                    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
-                    sycl::impl::transform(
+                    auto execution_policy = ::sycl_pstl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+                    sycl_pstl::impl::transform(
                         execution_policy,
                         plan->d_dm_list.begin() + dm_offset,
                         plan->d_dm_list.begin() + dm_offset + scrunch_count,

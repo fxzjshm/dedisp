@@ -37,7 +37,7 @@
 #include <sycl/helpers/sycl_differences.hpp>
 #include <sycl/helpers/sycl_iterator.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 template <bool UseSycl>
@@ -50,13 +50,13 @@ struct InnerProductImpl<true> {
   static T inner_product_sequential(ExecutionPolicy &exec, InputIt1 first1,
                                     InputIt1 last1, InputIt2 first2, T value,
                                     BinaryOperation1 op1, BinaryOperation2 op2) {
-    auto size = sycl::helpers::distance(first1, last1);
+    auto size = sycl_pstl::helpers::distance(first1, last1);
     if (size <= 0)
       return value;
 
     InputIt2 last2 = std::next(first2, size);
-    auto input_buff1 = sycl::helpers::make_const_buffer(first1, last1);
-    auto input_buff2 = sycl::helpers::make_const_buffer(first2, last2);
+    auto input_buff1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+    auto input_buff2 = sycl_pstl::helpers::make_const_buffer(first2, last2);
 
     return inner_product_sequential_sycl<typename ExecutionPolicy::kernelName>(exec.get_queue(), input_buff1,
                                                                                input_buff2, value, size, op1, op2);
@@ -97,8 +97,8 @@ template <class ExecutionPolicy, class InputIt1, class InputIt2, class T,
 T inner_product_sequential(ExecutionPolicy &exec, InputIt1 first1,
                            InputIt1 last1, InputIt2 first2, T value,
                            BinaryOperation1 op1, BinaryOperation2 op2) {
-  static constexpr bool UseSycl = std::is_base_of<sycl::helpers::SyclIterator, InputIt1>::value &&
-                                  std::is_base_of<sycl::helpers::SyclIterator, InputIt2>::value;
+  static constexpr bool UseSycl = std::is_base_of<sycl_pstl::helpers::SyclIterator, InputIt1>::value &&
+                                  std::is_base_of<sycl_pstl::helpers::SyclIterator, InputIt2>::value;
   return InnerProductImpl<UseSycl>::inner_product_sequential(exec, first1, last1, first2, value, op1, op2);
 }
 
@@ -116,7 +116,7 @@ T inner_product(ExecutionPolicy &exec, InputIt1 first1, InputIt1 last1,
                 BinaryOperation2 op2) {
   cl::sycl::queue q(exec.get_queue());
 
-  auto vectorSize = sycl::helpers::distance(first1, last1);
+  auto vectorSize = sycl_pstl::helpers::distance(first1, last1);
   if (vectorSize < 1) {
     return value;
   } else {
@@ -125,8 +125,8 @@ T inner_product(ExecutionPolicy &exec, InputIt1 first1, InputIt1 last1,
     InputIt2 last2(first2);
     std::advance(last2, vectorSize);
 
-    auto buf1 = sycl::helpers::make_const_buffer(first1, last1);
-    auto buf2 = sycl::helpers::make_const_buffer(first2, last2);
+    auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+    auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, last2);
     cl::sycl::buffer<T, 1> bufr((cl::sycl::range<1>(vectorSize)));
     auto length = vectorSize;
     auto ndRange = exec.calculateNdRange(length);
@@ -142,7 +142,7 @@ T inner_product(ExecutionPolicy &exec, InputIt1 first1, InputIt1 last1,
                          cl::sycl::access::target::local>
           scratch(ndRange.get_local_range(), h);
 
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [a1, a2, aR, scratch, length, local, passes, op1, op2](
                  cl::sycl::nd_item<1> id) {
             auto r = ReductionStrategy<T>(local, length, id, scratch);
@@ -182,7 +182,7 @@ T inner_product(ExecutionPolicy &snp, InputIt1 first1, InputIt1 last1,
 
   auto q = snp.get_queue();
   auto device = q.get_device();
-  auto size = sycl::helpers::distance(first1, last1);
+  auto size = sycl_pstl::helpers::distance(first1, last1);
   if (size <= 0)
     return value;
   InputIt2 last2 = std::next(first2, size);
@@ -194,8 +194,8 @@ T inner_product(ExecutionPolicy &snp, InputIt1 first1, InputIt1 last1,
   auto d = compute_mapreduce_descriptor(
       device, size, sizeof(value_type_1)+sizeof(value_type_2));
 
-  auto input_buff1 = sycl::helpers::make_const_buffer(first1, last1);
-  auto input_buff2 = sycl::helpers::make_const_buffer(first2, last2);
+  auto input_buff1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
+  auto input_buff2 = sycl_pstl::helpers::make_const_buffer(first2, last2);
 
   auto map = [=](size_t pos, value_type_1 x, value_type_2 y) {
     return op2(x, y);

@@ -36,7 +36,7 @@
 // SYCL helpers header
 #include <sycl/helpers/sycl_buffers.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* for_each.
@@ -48,13 +48,13 @@ void for_each(ExecutionPolicy &sep, Iterator b, Iterator e, UnaryFunction op) {
   {
     cl::sycl::queue q(sep.get_queue());
     auto device = q.get_device();
-    auto bufI = sycl::helpers::make_buffer(b, e);
+    auto bufI = sycl_pstl::helpers::make_buffer(b, e);
     auto vectorSize = bufI.get_count();
     const auto ndRange = sep.calculateNdRange(vectorSize);
     auto f = [vectorSize, ndRange, &bufI, op](
         cl::sycl::handler &h) mutable {
       auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [aI, op, vectorSize](cl::sycl::nd_item<1> id) {
             if (id.get_global_id(0) < vectorSize) {
               op(aI[id.get_global_id(0)]);

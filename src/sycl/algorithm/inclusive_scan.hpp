@@ -32,7 +32,7 @@
 #include <sycl/helpers/sycl_buffers.hpp>
 #include <sycl/algorithm/buffer_algorithms.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 #ifdef SYCL_PSTL_USE_OLD_ALGO
@@ -49,11 +49,11 @@ OutputIterator inclusive_scan(ExecutionPolicy &sep, InputIterator b,
   auto device = q.get_device();
   // limits us to random access iterators :/
   *b = bop(*b, init);
-  auto bufI = sycl::helpers::make_const_buffer(b, e);
+  auto bufI = sycl_pstl::helpers::make_const_buffer(b, e);
 
   auto vectorSize = bufI.get_count();
   // declare a temporary "swap" buffer
-  auto bufO = sycl::helpers::make_buffer(o, o + vectorSize);
+  auto bufO = sycl_pstl::helpers::make_buffer(o, o + vectorSize);
 
   const auto ndRange = sep.calculateNdRange(vectorSize);
   // calculate iteration count, with extra if not a power of two size buffer
@@ -83,7 +83,7 @@ OutputIterator inclusive_scan(ExecutionPolicy &sep, InputIterator b,
           inBuf->template get_access<cl::sycl::access::mode::read_write>(h);
       auto aO =
           outBuf->template get_access<cl::sycl::access::mode::read_write>(h);
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [aI, aO, bop, vectorSize, i](cl::sycl::nd_item<1> id) {
             size_t td = 1 << (i - 1);
             size_t m_id = id.get_global_id(0);
@@ -113,7 +113,7 @@ OutputIterator inclusive_scan(ExecutionPolicy &snp, InputIterator b,
 
   auto q = snp.get_queue();
   auto device = q.get_device();
-  size_t size = sycl::helpers::distance(b, e);
+  size_t size = sycl_pstl::helpers::distance(b, e);
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
   {
 #ifdef TRISYCL_CL_LANGUAGE_VERSION

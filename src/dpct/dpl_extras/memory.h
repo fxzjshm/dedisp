@@ -693,6 +693,14 @@ template <typename Pointer> Pointer get_raw_pointer(const Pointer &ptr) {
   return ptr;
 }
 
+template <typename InputIterator, typename OutputIterator>
+void copy(const InputIterator begin, const InputIterator end, const OutputIterator dest, sycl::queue& queue = dpct::get_default_queue()) {
+    typedef typename std::iterator_traits<InputIterator>::value_type T;
+    const T* begin_ptr = &(*begin);
+    T* dest_ptr = &(*dest);
+    queue.copy(begin_ptr, dest_ptr, std::distance(begin, end));
+}
+
 } // namespace dpct
 
 #endif

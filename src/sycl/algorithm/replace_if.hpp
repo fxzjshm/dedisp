@@ -36,7 +36,7 @@
 // SYCL helpers header
 #include <sycl/helpers/sycl_buffers.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /* replace_if.
@@ -59,7 +59,7 @@ void replace_if(ExecutionPolicy &sep, ForwardIt first, ForwardIt last,
   const auto f = [vectorSize, p, new_val, ndRange,
             &bufI](cl::sycl::handler &h) mutable {
     const auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [aI, vectorSize, p, new_val](cl::sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           if (global_id < vectorSize) {

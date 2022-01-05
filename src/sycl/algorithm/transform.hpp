@@ -36,7 +36,7 @@
 // Detail header
 #include <sycl/helpers/sycl_buffers.hpp>
 
-namespace sycl {
+namespace sycl_pstl {
 namespace impl {
 
 /** transform sycl implementation
@@ -55,15 +55,15 @@ OutputIterator transform(ExecutionPolicy &sep, Iterator b, Iterator e,
   {
     cl::sycl::queue q(sep.get_queue());
     auto device = q.get_device();
-    auto bufI = sycl::helpers::make_const_buffer(b, e);
-    auto bufO = sycl::helpers::make_buffer(out, out + bufI.get_count());
+    auto bufI = sycl_pstl::helpers::make_const_buffer(b, e);
+    auto bufO = sycl_pstl::helpers::make_buffer(out, out + bufI.get_count());
     auto vectorSize = bufI.get_count();
     const auto ndRange = sep.calculateNdRange(vectorSize);
     auto f = [vectorSize, ndRange, &bufI, &bufO, op](
         cl::sycl::handler &h) {
       auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
       auto aO = bufO.template get_access<cl::sycl::access::mode::write>(h);
-      h.parallel_for<typename ExecutionPolicy::kernelName>(
+      h.parallel_for(
           ndRange, [aI, aO, op, vectorSize](cl::sycl::nd_item<1> id) {
             if ((id.get_global_id(0) < vectorSize)) {
               aO[id.get_global_id(0)] = op(aI[id.get_global_id(0)]);
@@ -87,22 +87,22 @@ OutputIterator transform(ExecutionPolicy &sep, Iterator b, Iterator e,
 */
 template <class ExecutionPolicy, class InputIterator1, class InputIterator2, class OutputIterator,
           class BinaryOperation>
-OutputIterator transform(ExecutionPolicy &sep, InputIterator1 first1,
+/*OutputIterator*/ void transform(ExecutionPolicy &sep, InputIterator1 first1,
                          InputIterator1 last1, InputIterator2 first2,
                          OutputIterator result, BinaryOperation op) {
   cl::sycl::queue q(sep.get_queue());
   auto device = q.get_device();
-  auto buf1 = sycl::helpers::make_const_buffer(first1, last1);
+  auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
   auto n = buf1.get_count();
-  auto buf2 = sycl::helpers::make_const_buffer(first2, first2 + n);
-  auto res = sycl::helpers::make_buffer(result, result + n);
+  auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, first2 + n);
+  auto res = sycl_pstl::helpers::make_buffer(result, result + n);
   const auto ndRange = sep.calculateNdRange(n);
   auto f = [n, ndRange, &buf1, &buf2, &res, op](
       cl::sycl::handler &h) mutable {
     auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
     auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
     auto aO = res.template get_access<cl::sycl::access::mode::write>(h);
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [a1, a2, aO, op, n](cl::sycl::nd_item<1> id) {
           if (id.get_global_id(0) < n) {
             aO[id.get_global_id(0)] =
@@ -111,7 +111,7 @@ OutputIterator transform(ExecutionPolicy &sep, InputIterator1 first1,
         });
   };
   q.submit(f);
-  return first2 + n;
+  // return first2 + n;
 }
 
 /** transform sycl implementation
@@ -132,17 +132,17 @@ OutputIterator transform(ExecutionPolicy &sep, cl::sycl::queue &q,
                          InputIterator first2, OutputIterator result,
                          BinaryOperation op) {
   auto device = q.get_device();
-  auto buf1 = sycl::helpers::make_const_buffer(first1, last1);
+  auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
   auto n = buf1.get_count();
-  auto buf2 = sycl::helpers::make_const_buffer(first2, first2 + n);
-  auto res = sycl::helpers::make_buffer(result, result + n);
+  auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, first2 + n);
+  auto res = sycl_pstl::helpers::make_buffer(result, result + n);
   const auto ndRange = sep.calculateNdRange(n);
   auto f = [n, ndRange, &buf1, &buf2, &res, op](
       cl::sycl::handler &h) mutable {
     auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
     auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
     auto aO = res.template get_access<cl::sycl::access::mode::write>(h);
-    h.parallel_for<typename ExecutionPolicy::kernelName>(
+    h.parallel_for(
         ndRange, [a1, a2, aO, op, n](cl::sycl::nd_item<1> id) {
           if (id.get_global_id(0) < n) {
             aO[id.get_global_id(0)] =

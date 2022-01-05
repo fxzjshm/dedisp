@@ -53,7 +53,7 @@
 /** \addtogroup sycl
  * @{
  */
-namespace sycl {
+namespace sycl_pstl {
 namespace helpers {
 
 /**
