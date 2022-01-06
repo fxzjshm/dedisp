@@ -46,17 +46,17 @@ namespace impl {
  */
 template <class ExecutionPolicy, class BidirIt>
 void reverse(ExecutionPolicy &sep, BidirIt first, BidirIt last) {
-  cl::sycl::queue q{sep.get_queue()};
+  sycl::queue q{sep.get_queue()};
   const auto device = q.get_device();
   auto bufI = helpers::make_buffer(first, last);
 
   const auto vectorSize = bufI.get_count();
   const auto ndRange = sep.calculateNdRange(vectorSize / 2);
   const auto f = [vectorSize, ndRange,
-            &bufI](cl::sycl::handler &h) mutable {
-    const auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
+            &bufI](sycl::handler &h) mutable {
+    const auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
     h.parallel_for(
-        ndRange, [aI, vectorSize](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, vectorSize](sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           if (global_id < vectorSize / 2) {
             helpers::swap(aI[global_id], aI[vectorSize - global_id - 1]);

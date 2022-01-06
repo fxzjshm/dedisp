@@ -45,7 +45,7 @@ ForwardIt2 rotate_copy(ExecutionPolicy &sep, ForwardIt1 first,
 
   if (first == last) return result;
 
-  using namespace cl::sycl;
+  using namespace ::sycl;
   using value_type = typename std::iterator_traits<ForwardIt1>::value_type;
   std::vector<value_type> tmp(first, last);
   std::copy(first, last, tmp.begin());

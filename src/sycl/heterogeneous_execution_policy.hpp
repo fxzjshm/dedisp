@@ -30,7 +30,11 @@
 
 #include <cstdlib>
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#else
 #include <CL/sycl.hpp>
+#endif
 #include <sycl/execution_policy>
 #include <sycl/algorithm/transform.hpp>
 
@@ -45,11 +49,11 @@ namespace sycl_pstl {
 template <class KernelName>
 class sycl_heterogeneous_execution_policy
     : public sycl_execution_policy<KernelName> {
-  cl::sycl::queue q2;
+  sycl::queue q2;
   float ratio;
 
  public:
-  sycl_heterogeneous_execution_policy(cl::sycl::queue q1_, cl::sycl::queue q2_,
+  sycl_heterogeneous_execution_policy(sycl::queue q1_, sycl::queue q2_,
                                       float ratio_)
       : sycl_execution_policy<KernelName>(q1_) {
     q2 = q2_;
@@ -67,7 +71,7 @@ class sycl_heterogeneous_execution_policy
                      OutputIt result, BinaryOperation binary_op) {
     auto named_sep = getNamedPolicy(*this, binary_op);
 
-    cl::sycl::queue q1 = this->get_queue();
+    sycl::queue q1 = this->get_queue();
     int elements = std::distance(first1, last1);
     int crosspoint = elements * ratio;
     auto intermediate1(first1 + crosspoint);

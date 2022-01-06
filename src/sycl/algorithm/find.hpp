@@ -50,7 +50,7 @@ namespace impl {
 template <class ExecutionPolicy, class InputIt, class UnaryPredicate>
 InputIt find_impl(ExecutionPolicy &sep, InputIt b, InputIt e,
                   UnaryPredicate p) {
-  cl::sycl::queue q(sep.get_queue());
+  sycl::queue q(sep.get_queue());
 
   const auto device = q.get_device();
 
@@ -72,12 +72,12 @@ InputIt find_impl(ExecutionPolicy &sep, InputIt b, InputIt e,
   // map across the input testing whether they match the predicate
   // store the result of the predicate and the index in the array of the result
   const auto eqf = [vectorSize, ndRange, &buf, &t_buf,
-                    p](cl::sycl::handler &h) {
-    const auto aI = buf.template get_access<cl::sycl::access::mode::read>(h);
-    const auto aO = t_buf.template get_access<cl::sycl::access::mode::write>(h);
+                    p](sycl::handler &h) {
+    const auto aI = buf.template get_access<sycl::access::mode::read>(h);
+    const auto aO = t_buf.template get_access<sycl::access::mode::write>(h);
     h.parallel_for<
-        cl::sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(
-        ndRange, [aI, aO, vectorSize, p](cl::sycl::nd_item<1> id) {
+        sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(
+        ndRange, [aI, aO, vectorSize, p](sycl::nd_item<1> id) {
           const auto m_id = id.get_global_id(0);
           // store index or the vector length, so that we can find the
           // _first_ index which is true, as opposed to just "one" of them
@@ -94,34 +94,34 @@ InputIt find_impl(ExecutionPolicy &sep, InputIt b, InputIt e,
   auto length = vectorSize;
   do {
     const auto rf = [length, ndRange, local,
-                     &t_buf](cl::sycl::handler &h) {
+                     &t_buf](sycl::handler &h) {
       const auto aI =
-          t_buf.template get_access<cl::sycl::access::mode::read_write>(h);
-      cl::sycl::accessor<std::size_t, 1, cl::sycl::access::mode::read_write,
-                         cl::sycl::access::target::local>
+          t_buf.template get_access<sycl::access::mode::read_write>(h);
+      sycl::accessor<std::size_t, 1, sycl::access::mode::read_write,
+                         sycl::access::target::local>
           scratch(ndRange.get_local_range(), h);
 
       h.parallel_for<
-          cl::sycl::helpers::NameGen<1, typename ExecutionPolicy::kernelName> >(
-          ndRange, [aI, scratch, local, length](cl::sycl::nd_item<1> id) {
+          sycl::helpers::NameGen<1, typename ExecutionPolicy::kernelName> >(
+          ndRange, [aI, scratch, local, length](sycl::nd_item<1> id) {
             auto r =
                 ReductionStrategy<std::size_t>(local, length, id, scratch);
             r.workitem_get_from(aI);
             r.combine_threads([](std::size_t val1, std::size_t val2) {
-              return cl::sycl::min(val1, val2);
+              return sycl::min(val1, val2);
             });
             r.workgroup_write_to(aI);
           });
     };
     q.submit(rf);
     length = length / local;
-    ndRange = cl::sycl::nd_range<1>{cl::sycl::range<1>(std::max(length, local)),
+    ndRange = sycl::nd_range<1>{sycl::range<1>(std::max(length, local)),
                                     ndRange.get_local_range()};
   } while (length > 1);
   q.wait_and_throw();
 
   const auto hI =
-      t_buf.template get_access<cl::sycl::access::mode::read>();
+      t_buf.template get_access<sycl::access::mode::read>();
 
   // there's probably a cleaner way to do this, but essentially once we have
   // the "search index", we need to increment the begin iterator until
@@ -154,7 +154,7 @@ InputIt find_impl(ExecutionPolicy &snp, InputIt b, InputIt e,
   const auto pos = buffer_mapreduce(
       snp, q, input_buff, size, d,
       [p, size](std::size_t pos, value_type x) { return p(x) ? pos : size; },
-      [](std::size_t x, std::size_t y) { return cl::sycl::min(x, y); });
+      [](std::size_t x, std::size_t y) { return sycl::min(x, y); });
 
   if (pos == size) {
     return e;

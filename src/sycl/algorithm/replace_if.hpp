@@ -46,7 +46,7 @@ namespace impl {
 template <class ExecutionPolicy, class ForwardIt, class UnaryPredicate, class T>
 void replace_if(ExecutionPolicy &sep, ForwardIt first, ForwardIt last,
                 UnaryPredicate p, const T &new_value) {
-  cl::sycl::queue q{sep.get_queue()};
+  sycl::queue q{sep.get_queue()};
   const auto device = q.get_device();
   auto bufI = helpers::make_buffer(first, last);
 
@@ -57,10 +57,10 @@ void replace_if(ExecutionPolicy &sep, ForwardIt first, ForwardIt last,
   const auto ndRange = sep.calculateNdRange(vectorSize);
 
   const auto f = [vectorSize, p, new_val, ndRange,
-            &bufI](cl::sycl::handler &h) mutable {
-    const auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
+            &bufI](sycl::handler &h) mutable {
+    const auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
     h.parallel_for(
-        ndRange, [aI, vectorSize, p, new_val](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, vectorSize, p, new_val](sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           if (global_id < vectorSize) {
             if(p(aI[global_id])) {

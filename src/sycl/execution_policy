@@ -45,7 +45,11 @@
 #undef isunordered
 #undef isgreaterequal
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#else
 #include <CL/sycl.hpp>
+#endif
 #include <sycl/algorithm/for_each.hpp>
 #include <sycl/algorithm/for_each_n.hpp>
 #include <sycl/algorithm/sort.hpp>
@@ -81,7 +85,7 @@ struct DefaultKernelName {};
 */
 template <class KernelName = DefaultKernelName>
 class sycl_execution_policy {
-  cl::sycl::queue m_q;
+  sycl::queue m_q;
 
  public:
   // The kernel name when using lambdas
@@ -89,7 +93,7 @@ class sycl_execution_policy {
 
   sycl_execution_policy() = default;
 
-  sycl_execution_policy(cl::sycl::queue q) : m_q(q){};
+  sycl_execution_policy(sycl::queue q) : m_q(q){};
 
   sycl_execution_policy(const sycl_execution_policy&) = default;
 
@@ -97,19 +101,19 @@ class sycl_execution_policy {
   std::string get_name() const { return typeid(kernelName).name(); };
 
   // Returns the queue, if any
-  cl::sycl::queue get_queue() const { return m_q; }
+  sycl::queue get_queue() const { return m_q; }
 
   /* Calculate NdRange.
   * @brief Calculates an nd_range with a global size divisable by problemSize
   * @param problemSize : The problem size
   */
-  cl::sycl::nd_range<1> calculateNdRange(size_t problemSize) {
+  sycl::nd_range<1> calculateNdRange(size_t problemSize) {
     const auto& d = m_q.get_device();
-    const cl::sycl::id<3> maxWorkItemSizes =
-      d.template get_info<cl::sycl::info::device::max_work_item_sizes>();
+    const sycl::id<3> maxWorkItemSizes =
+      d.template get_info<sycl::info::device::max_work_item_sizes>();
     const auto localSize = std::min(problemSize,
         std::min(
-          d.template get_info<cl::sycl::info::device::max_work_group_size>(),
+          d.template get_info<sycl::info::device::max_work_group_size>(),
           maxWorkItemSizes[0]
         ));
 
@@ -120,8 +124,8 @@ class sycl_execution_policy {
       globalSize = (problemSize / localSize + 1) * localSize;
     }
 
-    return cl::sycl::nd_range<1>{cl::sycl::range<1>{globalSize},
-                                 cl::sycl::range<1>{localSize}};
+    return sycl::nd_range<1>{sycl::range<1>{globalSize},
+                                 sycl::range<1>{localSize}};
   }
 
   /** reduce
@@ -172,7 +176,7 @@ class sycl_execution_policy {
    */
   template <class RandomAccessIterator>
   inline void sort(RandomAccessIterator b, RandomAccessIterator e) {
-    cl::sycl::queue q(get_queue());
+    sycl::queue q(get_queue());
     typedef
         typename std::iterator_traits<RandomAccessIterator>::value_type type_;
     auto buf = std::move(sycl_pstl::helpers::make_buffer(b, e));

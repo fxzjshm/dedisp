@@ -53,7 +53,7 @@ template <class ExecutionPolicy, class InputIterator, class Size,
           class Function>
 InputIterator for_each_n(ExecutionPolicy &exec, InputIterator first, Size n,
                          Function f) {
-  cl::sycl::queue q(exec.get_queue());
+  sycl::queue q(exec.get_queue());
   if (n > 0) {
     auto last(first + n);
     auto device = q.get_device();
@@ -61,10 +61,10 @@ InputIterator for_each_n(ExecutionPolicy &exec, InputIterator first, Size n,
     auto vectorSize = bufI.get_count();
     const auto ndRange = exec.calculateNdRange(vectorSize);
     auto cg = [vectorSize, ndRange, &bufI, f](
-        cl::sycl::handler &h) mutable {
-      auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
+        sycl::handler &h) mutable {
+      auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
       h.parallel_for(
-          ndRange, [vectorSize, aI, f](cl::sycl::nd_item<1> id) {
+          ndRange, [vectorSize, aI, f](sycl::nd_item<1> id) {
             if (id.get_global_id(0) < vectorSize) {
               f(aI[id.get_global_id(0)]);
             }

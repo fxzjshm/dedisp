@@ -72,8 +72,8 @@ template <typename T>
 class sort_kernel_sequential {
   /* Aliases for SYCL accessors */
   using sycl_rw_acc =
-      cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_write,
-                         cl::sycl::access::target::global_buffer>;
+      sycl::accessor<T, 1, sycl::access::mode::read_write,
+                         sycl::access::target::global_buffer>;
 
   sycl_rw_acc a_;
   size_t vS_;
@@ -101,8 +101,8 @@ template <typename T, class ComparableOperator>
 class sort_kernel_sequential_comp {
   /* Aliases for SYCL accessors */
   using sycl_rw_acc =
-      cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_write,
-                         cl::sycl::access::target::global_buffer>;
+      sycl::accessor<T, 1, sycl::access::mode::read_write,
+                         sycl::access::target::global_buffer>;
 
   sycl_rw_acc a_;
   size_t vS_;
@@ -130,8 +130,8 @@ namespace impl {
 
 /* Aliases for SYCL accessors */
 template <typename T>
-using sycl_rw_acc = cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_write,
-                                       cl::sycl::access::target::global_buffer>;
+using sycl_rw_acc = sycl::accessor<T, 1, sycl::access::mode::read_write,
+                                       sycl::access::target::global_buffer>;
 
 /** isPowerOfTwo.
  * Quick check to ensure num is a power of two.
@@ -151,10 +151,10 @@ inline bool isPowerOfTwo<double>(double num) = delete;
 /** sequential_sort.
  * Command group to call the sequential sort kernel */
 template <typename T, typename Alloc>
-void sequential_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
+void sequential_sort(sycl::queue q, sycl::buffer<T, 1, Alloc> buf,
                      size_t vectorSize) {
-  auto f = [buf, vectorSize](cl::sycl::handler &h) mutable {
-    auto a = buf.template get_access<cl::sycl::access::mode::read_write>(h);
+  auto f = [buf, vectorSize](sycl::handler &h) mutable {
+    auto a = buf.template get_access<sycl::access::mode::read_write>(h);
     h.single_task(sort_kernel_sequential<T>(a, vectorSize));
   };
   q.submit(f);
@@ -163,10 +163,10 @@ void sequential_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
 /** sequential_sort.
  * Command group to call the sequential sort kernel */
 template <typename T, typename Alloc, class ComparableOperator, typename Name>
-void sequential_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
+void sequential_sort(sycl::queue q, sycl::buffer<T, 1, Alloc> buf,
                      size_t vectorSize, ComparableOperator comp) {
-  auto f = [buf, vectorSize, comp](cl::sycl::handler &h) mutable {
-    auto a = buf.template get_access<cl::sycl::access::mode::read_write>(h);
+  auto f = [buf, vectorSize, comp](sycl::handler &h) mutable {
+    auto a = buf.template get_access<sycl::access::mode::read_write>(h);
     h.single_task<Name>(sort_kernel_sequential_comp<T, ComparableOperator>(
         a, vectorSize, comp));
   };
@@ -177,7 +177,7 @@ void sequential_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
  * Performs a bitonic sort on the given buffer
  */
 template <typename T, typename Alloc>
-void bitonic_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
+void bitonic_sort(sycl::queue q, sycl::buffer<T, 1, Alloc> buf,
                   size_t vectorSize) {
   int numStages = 0;
   // 2^numStages should be equal to length
@@ -185,17 +185,17 @@ void bitonic_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
   for (int tmp = vectorSize; tmp > 1; tmp >>= 1) {
     ++numStages;
   }
-  cl::sycl::range<1> r{vectorSize / 2};
+  sycl::range<1> r{vectorSize / 2};
   for (int stage = 0; stage < numStages; ++stage) {
     // Every stage has stage + 1 passes
     for (int passOfStage = 0; passOfStage < stage + 1; ++passOfStage) {
-      auto f = [=](cl::sycl::handler &h) mutable {
-        auto a = buf.template get_access<cl::sycl::access::mode::read_write>(h);
+      auto f = [=](sycl::handler &h) mutable {
+        auto a = buf.template get_access<sycl::access::mode::read_write>(h);
         h.parallel_for<sort_kernel_bitonic<T>>(
-            cl::sycl::range<1>{r},
-            [a, stage, passOfStage](cl::sycl::item<1> it) {
+            sycl::range<1>{r},
+            [a, stage, passOfStage](sycl::item<1> it) {
               int sortIncreasing = 1;
-              cl::sycl::id<1> id = it.get_id();
+              sycl::id<1> id = it.get_id();
               int threadId = id.get(0);
 
               int pairDistance = 1 << (stage - passOfStage);
@@ -238,7 +238,7 @@ void bitonic_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
  * Performs a bitonic sort on the given buffer
  */
 template <typename T, typename Alloc, class ComparableOperator, typename Name>
-void bitonic_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
+void bitonic_sort(sycl::queue q, sycl::buffer<T, 1, Alloc> buf,
                   size_t vectorSize, ComparableOperator comp) {
   int numStages = 0;
   // 2^numStages should be equal to length
@@ -246,17 +246,17 @@ void bitonic_sort(cl::sycl::queue q, cl::sycl::buffer<T, 1, Alloc> buf,
   for (int tmp = vectorSize; tmp > 1; tmp >>= 1) {
     ++numStages;
   }
-  cl::sycl::range<1> r{vectorSize / 2};
+  sycl::range<1> r{vectorSize / 2};
   for (int stage = 0; stage < numStages; ++stage) {
     // Every stage has stage + 1 passes
     for (int passOfStage = 0; passOfStage < stage + 1; ++passOfStage) {
-      auto f = [=](cl::sycl::handler &h) mutable {
-        auto a = buf.template get_access<cl::sycl::access::mode::read_write>(h);
+      auto f = [=](sycl::handler &h) mutable {
+        auto a = buf.template get_access<sycl::access::mode::read_write>(h);
         h.parallel_for<Name>(
-            cl::sycl::range<1>{r},
-            [a, stage, passOfStage, comp](cl::sycl::item<1> it) {
+            sycl::range<1>{r},
+            [a, stage, passOfStage, comp](sycl::item<1> it) {
               int sortIncreasing = 1;
-              cl::sycl::id<1> id = it.get_id();
+              sycl::id<1> id = it.get_id();
               int threadId = id.get(0);
 
               int pairDistance = 1 << (stage - passOfStage);
@@ -299,7 +299,7 @@ template<typename T>
 struct buffer_traits;
 
 template<typename T, typename Alloc>
-struct buffer_traits<cl::sycl::buffer<T, 1, Alloc>> {
+struct buffer_traits<sycl::buffer<T, 1, Alloc>> {
   typedef Alloc allocator_type;
 };
 
@@ -312,7 +312,7 @@ struct buffer_traits<cl::sycl::buffer<T, 1, Alloc>> {
  */
 template <class ExecutionPolicy, class RandomIt, class CompareOp>
 void sort(ExecutionPolicy &sep, RandomIt first, RandomIt last, CompareOp comp) {
-  cl::sycl::queue q(sep.get_queue());
+  sycl::queue q(sep.get_queue());
   typedef typename std::iterator_traits<RandomIt>::value_type type_;
   auto buf = std::move(sycl_pstl::helpers::make_buffer(first, last));
   auto vectorSize = buf.get_count();

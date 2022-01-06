@@ -46,7 +46,7 @@ namespace impl {
 template <class ExecutionPolicy, class ForwardIt, class Generator>
 void generate(ExecutionPolicy &sep, ForwardIt first, ForwardIt last,
               Generator g) {
-  cl::sycl::queue q{sep.get_queue()};
+  sycl::queue q{sep.get_queue()};
   const auto device = q.get_device();
 
   auto bufI = helpers::make_buffer(first, last);
@@ -55,10 +55,10 @@ void generate(ExecutionPolicy &sep, ForwardIt first, ForwardIt last,
   const auto ndRange = sep.calculateNdRange(vectorSize);
 
   const auto f = [vectorSize, ndRange, &bufI,
-            g](cl::sycl::handler &h) mutable {
-    const auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
+            g](sycl::handler &h) mutable {
+    const auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
     h.parallel_for(
-        ndRange, [aI, g, vectorSize](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, g, vectorSize](sycl::nd_item<1> id) {
           if (id.get_global_id(0) < vectorSize) {
             aI[id.get_global_id(0)] = g();
           }

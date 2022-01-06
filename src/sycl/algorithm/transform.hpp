@@ -53,18 +53,18 @@ template <class ExecutionPolicy, class Iterator, class OutputIterator,
 OutputIterator transform(ExecutionPolicy &sep, Iterator b, Iterator e,
                          OutputIterator out, UnaryOperation op) {
   {
-    cl::sycl::queue q(sep.get_queue());
+    sycl::queue q(sep.get_queue());
     auto device = q.get_device();
     auto bufI = sycl_pstl::helpers::make_const_buffer(b, e);
     auto bufO = sycl_pstl::helpers::make_buffer(out, out + bufI.get_count());
     auto vectorSize = bufI.get_count();
     const auto ndRange = sep.calculateNdRange(vectorSize);
     auto f = [vectorSize, ndRange, &bufI, &bufO, op](
-        cl::sycl::handler &h) {
-      auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
-      auto aO = bufO.template get_access<cl::sycl::access::mode::write>(h);
+        sycl::handler &h) {
+      auto aI = bufI.template get_access<sycl::access::mode::read>(h);
+      auto aO = bufO.template get_access<sycl::access::mode::write>(h);
       h.parallel_for(
-          ndRange, [aI, aO, op, vectorSize](cl::sycl::nd_item<1> id) {
+          ndRange, [aI, aO, op, vectorSize](sycl::nd_item<1> id) {
             if ((id.get_global_id(0) < vectorSize)) {
               aO[id.get_global_id(0)] = op(aI[id.get_global_id(0)]);
             }
@@ -90,7 +90,7 @@ template <class ExecutionPolicy, class InputIterator1, class InputIterator2, cla
 /*OutputIterator*/ void transform(ExecutionPolicy &sep, InputIterator1 first1,
                          InputIterator1 last1, InputIterator2 first2,
                          OutputIterator result, BinaryOperation op) {
-  cl::sycl::queue q(sep.get_queue());
+  sycl::queue q(sep.get_queue());
   auto device = q.get_device();
   auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
   auto n = buf1.get_count();
@@ -98,12 +98,12 @@ template <class ExecutionPolicy, class InputIterator1, class InputIterator2, cla
   auto res = sycl_pstl::helpers::make_buffer(result, result + n);
   const auto ndRange = sep.calculateNdRange(n);
   auto f = [n, ndRange, &buf1, &buf2, &res, op](
-      cl::sycl::handler &h) mutable {
-    auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
-    auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
-    auto aO = res.template get_access<cl::sycl::access::mode::write>(h);
+      sycl::handler &h) mutable {
+    auto a1 = buf1.template get_access<sycl::access::mode::read>(h);
+    auto a2 = buf2.template get_access<sycl::access::mode::read>(h);
+    auto aO = res.template get_access<sycl::access::mode::write>(h);
     h.parallel_for(
-        ndRange, [a1, a2, aO, op, n](cl::sycl::nd_item<1> id) {
+        ndRange, [a1, a2, aO, op, n](sycl::nd_item<1> id) {
           if (id.get_global_id(0) < n) {
             aO[id.get_global_id(0)] =
                 op(a1[id.get_global_id(0)], a2[id.get_global_id(0)]);
@@ -127,7 +127,7 @@ template <class ExecutionPolicy, class InputIterator1, class InputIterator2, cla
 */
 template <class ExecutionPolicy, class InputIterator, class OutputIterator,
           class BinaryOperation>
-OutputIterator transform(ExecutionPolicy &sep, cl::sycl::queue &q,
+OutputIterator transform(ExecutionPolicy &sep, sycl::queue &q,
                          InputIterator first1, InputIterator last1,
                          InputIterator first2, OutputIterator result,
                          BinaryOperation op) {
@@ -138,12 +138,12 @@ OutputIterator transform(ExecutionPolicy &sep, cl::sycl::queue &q,
   auto res = sycl_pstl::helpers::make_buffer(result, result + n);
   const auto ndRange = sep.calculateNdRange(n);
   auto f = [n, ndRange, &buf1, &buf2, &res, op](
-      cl::sycl::handler &h) mutable {
-    auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
-    auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
-    auto aO = res.template get_access<cl::sycl::access::mode::write>(h);
+      sycl::handler &h) mutable {
+    auto a1 = buf1.template get_access<sycl::access::mode::read>(h);
+    auto a2 = buf2.template get_access<sycl::access::mode::read>(h);
+    auto aO = res.template get_access<sycl::access::mode::write>(h);
     h.parallel_for(
-        ndRange, [a1, a2, aO, op, n](cl::sycl::nd_item<1> id) {
+        ndRange, [a1, a2, aO, op, n](sycl::nd_item<1> id) {
           if (id.get_global_id(0) < n) {
             aO[id.get_global_id(0)] =
                 op(a1[id.get_global_id(0)], a2[id.get_global_id(0)]);
@@ -165,18 +165,18 @@ OutputIterator transform(ExecutionPolicy &sep, cl::sycl::queue &q,
 * @return  An iterator pointing to the last element
 */
 template <class ExecutionPolicy, class Buffer, class BinaryOperation>
-void transform(ExecutionPolicy &sep, cl::sycl::queue &q, Buffer &buf1,
+void transform(ExecutionPolicy &sep, sycl::queue &q, Buffer &buf1,
                Buffer &buf2, Buffer &res, BinaryOperation op) {
   auto device = q.get_device();
   auto n = buf1.get_count();
   const auto ndRange = sep.calculateNdRange(n);
   auto f = [n, ndRange, &buf1, &buf2, &res, op](
-      cl::sycl::handler &h) mutable {
-    auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
-    auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
-    auto aO = res.template get_access<cl::sycl::access::mode::write>(h);
+      sycl::handler &h) mutable {
+    auto a1 = buf1.template get_access<sycl::access::mode::read>(h);
+    auto a2 = buf2.template get_access<sycl::access::mode::read>(h);
+    auto aO = res.template get_access<sycl::access::mode::write>(h);
     h.parallel_for<class TransformAlgorithm>(
-        ndRange, [a1, a2, aO, op, n](cl::sycl::nd_item<1> id) {
+        ndRange, [a1, a2, aO, op, n](sycl::nd_item<1> id) {
           if (id.get_global_id(0) < n) {
             aO[id.get_global_id(0)] =
                 op(a1[id.get_global_id(0)], a2[id.get_global_id(0)]);

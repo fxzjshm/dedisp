@@ -45,7 +45,7 @@ namespace impl {
  */
 template <typename ExecutionPolicy, typename ForwardIt, typename T>
 void fill(ExecutionPolicy &sep, ForwardIt b, ForwardIt e, const T &value) {
-  cl::sycl::queue q { sep.get_queue() };
+  sycl::queue q { sep.get_queue() };
   auto device = q.get_device();
   auto bufI = helpers::make_buffer( b, e );
   // copy value into a local variable, as we cannot capture it by reference
@@ -53,10 +53,10 @@ void fill(ExecutionPolicy &sep, ForwardIt b, ForwardIt e, const T &value) {
   auto vectorSize = bufI.get_count();
   const auto ndRange = sep.calculateNdRange(vectorSize);
   auto f = [vectorSize, ndRange, &bufI, val](
-      cl::sycl::handler &h) mutable {
-    auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
+      sycl::handler &h) mutable {
+    auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
     h.parallel_for(
-        ndRange, [aI, val, vectorSize](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, val, vectorSize](sycl::nd_item<1> id) {
           if (id.get_global_id(0) < vectorSize) {
             aI[id.get_global_id(0)] = val;
           }

@@ -45,7 +45,7 @@ namespace impl {
 OutputIterator inclusive_scan(ExecutionPolicy &sep, InputIterator b,
                               InputIterator e, OutputIterator o, T init,
                               BinaryOperation bop) {
-  cl::sycl::queue q(sep.get_queue());
+  sycl::queue q(sep.get_queue());
   auto device = q.get_device();
   // limits us to random access iterators :/
   *b = bop(*b, init);
@@ -78,13 +78,13 @@ OutputIterator inclusive_scan(ExecutionPolicy &sep, InputIterator b,
   int i = 1;
   do {
     auto f = [vectorSize, i, ndRange, inBuf, outBuf, bop](
-        cl::sycl::handler &h) {
+        sycl::handler &h) {
       auto aI =
-          inBuf->template get_access<cl::sycl::access::mode::read_write>(h);
+          inBuf->template get_access<sycl::access::mode::read_write>(h);
       auto aO =
-          outBuf->template get_access<cl::sycl::access::mode::read_write>(h);
+          outBuf->template get_access<sycl::access::mode::read_write>(h);
       h.parallel_for(
-          ndRange, [aI, aO, bop, vectorSize, i](cl::sycl::nd_item<1> id) {
+          ndRange, [aI, aO, bop, vectorSize, i](sycl::nd_item<1> id) {
             size_t td = 1 << (i - 1);
             size_t m_id = id.get_global_id(0);
 
@@ -117,7 +117,7 @@ OutputIterator inclusive_scan(ExecutionPolicy &snp, InputIterator b,
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
   {
 #ifdef TRISYCL_CL_LANGUAGE_VERSION
-    cl::sycl::buffer<value_type, 1> buffer { b, e };
+    sycl::buffer<value_type, 1> buffer { b, e };
     buffer.set_final_data(o);
 #else
     std::shared_ptr<value_type> data { new value_type[size],
@@ -126,7 +126,7 @@ OutputIterator inclusive_scan(ExecutionPolicy &snp, InputIterator b,
       }
     };
     std::copy_n(b, size, data.get());
-    cl::sycl::buffer<value_type, 1> buffer { data, cl::sycl::range<1>{ size } };
+    sycl::buffer<value_type, 1> buffer { data, sycl::range<1>{ size } };
 #endif
 
     auto d = compute_mapscan_descriptor(device, size, sizeof(value_type));

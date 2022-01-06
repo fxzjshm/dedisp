@@ -76,12 +76,12 @@ OutputIterator exclusive_scan(ExecutionPolicy &sep, InputIterator b,
   // this works, as an exclusive scan is equivalent to a shift
   // (with initial set at element 0) followed by an inclusive scan
   auto shr = [vectorSize, ndRange, inBuf, outBuf, init](
-      cl::sycl::handler &h) {
-    auto aI = inBuf->template get_access<cl::sycl::access::mode::read>(h);
-    auto aO = outBuf->template get_access<cl::sycl::access::mode::write>(h);
+      sycl::handler &h) {
+    auto aI = inBuf->template get_access<sycl::access::mode::read>(h);
+    auto aO = outBuf->template get_access<sycl::access::mode::write>(h);
     h.parallel_for<
-        cl::sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(
-        ndRange, [aI, aO, init, vectorSize](cl::sycl::nd_item<1> id) {
+        sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(
+        ndRange, [aI, aO, init, vectorSize](sycl::nd_item<1> id) {
           size_t m_id = id.get_global_id(0);
           if (m_id > 0) {
             aO[m_id] = aI[m_id - 1];
@@ -97,14 +97,14 @@ OutputIterator exclusive_scan(ExecutionPolicy &sep, InputIterator b,
   int i = 1;
   do {
     auto f = [vectorSize, i, ndRange, inBuf, outBuf, bop](
-        cl::sycl::handler &h) {
+        sycl::handler &h) {
       auto aI =
-          inBuf->template get_access<cl::sycl::access::mode::read_write>(h);
+          inBuf->template get_access<sycl::access::mode::read_write>(h);
       auto aO =
-          outBuf->template get_access<cl::sycl::access::mode::read_write>(h);
+          outBuf->template get_access<sycl::access::mode::read_write>(h);
       h.parallel_for<
-          cl::sycl::helpers::NameGen<1, typename ExecutionPolicy::kernelName> >(
-          ndRange, [aI, aO, bop, vectorSize, i](cl::sycl::nd_item<1> id) {
+          sycl::helpers::NameGen<1, typename ExecutionPolicy::kernelName> >(
+          ndRange, [aI, aO, bop, vectorSize, i](sycl::nd_item<1> id) {
             size_t td = 1 << (i - 1);
             size_t m_id = id.get_global_id(0);
             if (m_id < vectorSize && m_id >= td) {
@@ -135,7 +135,7 @@ OutputIterator exclusive_scan(ExecutionPolicy &snp, InputIterator b,
                               InputIterator e, OutputIterator o, T init,
                               BinaryOperation bop) {
 
-  cl::sycl::queue q(snp.get_queue());
+  sycl::queue q(snp.get_queue());
   auto device = q.get_device();
   auto size = sycl_pstl::helpers::distance(b, e);
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
@@ -147,7 +147,7 @@ OutputIterator exclusive_scan(ExecutionPolicy &snp, InputIterator b,
 
   {
 #ifdef TRISYCL_CL_LANGUAGE_VERSION
-    cl::sycl::buffer<value_type, 1> buffer { vect.data(), size - 1 };
+    sycl::buffer<value_type, 1> buffer { vect.data(), size - 1 };
     buffer.set_final_data(o);
 #else
     std::shared_ptr<value_type> data { new value_type[size-1],
@@ -157,7 +157,7 @@ OutputIterator exclusive_scan(ExecutionPolicy &snp, InputIterator b,
       }
     };
     std::copy_n(b, size-1, data.get());
-    cl::sycl::buffer<value_type, 1> buffer { data, cl::sycl::range<1>{size-1} };
+    sycl::buffer<value_type, 1> buffer { data, sycl::range<1>{size-1} };
 #endif
 
     auto d = compute_mapscan_descriptor(device, size - 1, sizeof(value_type));

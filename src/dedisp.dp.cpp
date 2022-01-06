@@ -26,7 +26,11 @@
 
 #include <dedisp.h>
 
+#if __has_include(<sycl/sycl.hpp>)
 #include <sycl/sycl.hpp>
+#else
+#include <CL/sycl.hpp>
+#endif
 // For copying and scrunching the DM list
 #include <sycl/execution_policy>
 #include <sycl/algorithm/fill.hpp>

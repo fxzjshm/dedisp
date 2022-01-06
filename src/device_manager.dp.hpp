@@ -16,7 +16,11 @@
 
 #pragma once
 
+#if __has_include(<sycl/sycl.hpp>)
 #include <sycl/sycl.hpp>
+#else
+#include <CL/sycl.hpp>
+#endif
 
 // reference: dpct/device.hpp and boost/compute/system.hpp
 

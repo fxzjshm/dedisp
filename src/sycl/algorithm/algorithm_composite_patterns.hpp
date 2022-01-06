@@ -34,12 +34,12 @@
 
 template <typename T>
 using local_rw_acc =
-    cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>;
+    sycl::accessor<T, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>;
 
-template <typename T, cl::sycl::access::mode AM>
+template <typename T, sycl::access::mode AM>
 using global_acc =
-    cl::sycl::accessor<T, 1, AM, cl::sycl::access::target::global_buffer>;
+    sycl::accessor<T, 1, AM, sycl::access::target::global_buffer>;
 
 /** class RedutionStrategy.
 * @brief This class represent a common pattern for reductive algorithms on GPU
@@ -51,11 +51,11 @@ class ReductionStrategy {
   int globalid_;
   int local_;
   int length_;
-  cl::sycl::nd_item<1> id_;
+  sycl::nd_item<1> id_;
   local_rw_acc<T> scratch_;
 
  public:
-  ReductionStrategy(int loc, int len, cl::sycl::nd_item<1> i,
+  ReductionStrategy(int loc, int len, sycl::nd_item<1> i,
                     const local_rw_acc<T>& localmem)
       : localid_(i.get_local_id(0)),
         globalid_(i.get_global_id(0)),
@@ -64,24 +64,24 @@ class ReductionStrategy {
         id_(i),
         scratch_(localmem) {}
 
-  template <typename BinaryOp, typename T1, cl::sycl::access::mode AM1,
-            typename T2, cl::sycl::access::mode AM2>
+  template <typename BinaryOp, typename T1, sycl::access::mode AM1,
+            typename T2, sycl::access::mode AM2>
   void workitem_get_from(BinaryOp op, const global_acc<T1, AM1>& elem1,
                          const global_acc<T2, AM2>& elem2) {
     scratch_[localid_] = op(elem1[globalid_], elem2[globalid_]);
-    id_.barrier(cl::sycl::access::fence_space::local_space);
+    id_.barrier(sycl::access::fence_space::local_space);
   }
 
-  template <typename UnaryOp, typename T1, cl::sycl::access::mode AM1>
+  template <typename UnaryOp, typename T1, sycl::access::mode AM1>
   void workitem_get_from(UnaryOp op, const global_acc<T1, AM1>& elem1) {
     scratch_[localid_] = op(elem1[globalid_]);
-    id_.barrier(cl::sycl::access::fence_space::local_space);
+    id_.barrier(sycl::access::fence_space::local_space);
   }
 
-  template <typename T1, cl::sycl::access::mode AM1>
+  template <typename T1, sycl::access::mode AM1>
   void workitem_get_from(const global_acc<T1, AM1> elem) {
     scratch_[localid_] = elem[globalid_];
-    id_.barrier(cl::sycl::access::fence_space::local_space);
+    id_.barrier(sycl::access::fence_space::local_space);
   }
 
   template <class BinaryOperator>
@@ -92,11 +92,11 @@ class ReductionStrategy {
         scratch_[localid_] =
             bop(scratch_[localid_], scratch_[localid_ + offset]);
       }
-      id_.barrier(cl::sycl::access::fence_space::local_space);
+      id_.barrier(sycl::access::fence_space::local_space);
     }
   }
 
-  template <typename T1, cl::sycl::access::mode AM1>
+  template <typename T1, sycl::access::mode AM1>
   void workgroup_write_to(const global_acc<T1, AM1>& out) {
     if (localid_ == 0) {
       out[id_.get_group(0)] = scratch_[localid_];

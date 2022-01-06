@@ -52,7 +52,7 @@ template <class ExecutionPolicy, class ForwardIt1, class ForwardIt2,
           class BinaryPredicate>
 bool equal(ExecutionPolicy& exec, ForwardIt1 first1, ForwardIt1 last1,
            ForwardIt2 first2, ForwardIt2 last2, BinaryPredicate p) {
-  cl::sycl::queue q(exec.get_queue());
+  sycl::queue q(exec.get_queue());
 
   auto size1 = sycl_pstl::helpers::distance(first1, last1);
   auto size2 = sycl_pstl::helpers::distance(first2, last2);
@@ -73,23 +73,23 @@ bool equal(ExecutionPolicy& exec, ForwardIt1 first1, ForwardIt1 last1,
 
   auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, last1);
   auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, last2);
-  auto bufR = cl::sycl::buffer<bool, 1>(cl::sycl::range<1>(size1));
+  auto bufR = sycl::buffer<bool, 1>(sycl::range<1>(size1));
 
   do {
     int passes = 0;
 
     auto f = [passes, length, ndRange, local, &buf1, &buf2, &bufR,
-              p](cl::sycl::handler& h) mutable {
-      auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
-      auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
-      auto aR = bufR.template get_access<cl::sycl::access::mode::read_write>(h);
-      cl::sycl::accessor<bool, 1, cl::sycl::access::mode::read_write,
-                         cl::sycl::access::target::local>
+              p](sycl::handler& h) mutable {
+      auto a1 = buf1.template get_access<sycl::access::mode::read>(h);
+      auto a2 = buf2.template get_access<sycl::access::mode::read>(h);
+      auto aR = bufR.template get_access<sycl::access::mode::read_write>(h);
+      sycl::accessor<bool, 1, sycl::access::mode::read_write,
+                         sycl::access::target::local>
           scratch(ndRange.get_local_range(), h);
 
       h.parallel_for(
           ndRange, [a1, a2, aR, scratch, passes, local, length,
-              p](cl::sycl::nd_item<1> id) {
+              p](sycl::nd_item<1> id) {
             auto r =
                 ReductionStrategy<bool>(local, length, id, scratch);
             if (passes == 0) {
@@ -104,13 +104,13 @@ bool equal(ExecutionPolicy& exec, ForwardIt1 first1, ForwardIt1 last1,
 
     q.submit(f);
     length = length / local;
-    ndRange = cl::sycl::nd_range<1>{cl::sycl::range<1>(std::max(length, local)),
+    ndRange = sycl::nd_range<1>{sycl::range<1>(std::max(length, local)),
                                     ndRange.get_local_range()};
     ++passes;
   } while (length > 1);
   q.wait_and_throw();
-  auto hr = bufR.template get_access<cl::sycl::access::mode::read>(
-      cl::sycl::range<1>{1}, cl::sycl::id<1>{0});
+  auto hr = bufR.template get_access<sycl::access::mode::read>(
+      sycl::range<1>{1}, sycl::id<1>{0});
   return hr[0];
 }
 

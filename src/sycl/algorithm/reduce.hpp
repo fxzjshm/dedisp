@@ -57,7 +57,7 @@ template <typename ExecutionPolicy,
           typename BinaryOperation>
 typename std::iterator_traits<Iterator>::value_type reduce(
     ExecutionPolicy &sep, Iterator b, Iterator e, T init, BinaryOperation bop) {
-  cl::sycl::queue q(sep.get_queue());
+  sycl::queue q(sep.get_queue());
 
   auto vectorSize = sycl_pstl::helpers::distance(b, e);
 
@@ -73,14 +73,14 @@ typename std::iterator_traits<Iterator>::value_type reduce(
   auto ndRange = sep.calculateNdRange(length);
   const auto local = ndRange.get_local_range()[0];
 
-  auto f = [&length, &ndRange, local, &bufI, bop](cl::sycl::handler &h) mutable {
-    auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
-    cl::sycl::accessor<type_, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>
+  auto f = [&length, &ndRange, local, &bufI, bop](sycl::handler &h) mutable {
+    auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
+    sycl::accessor<type_, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
         scratch(ndRange.get_local_range(), h);
 
     h.parallel_for(
-        ndRange, [aI, scratch, local, length, bop](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, scratch, local, length, bop](sycl::nd_item<1> id) {
           auto r = ReductionStrategy<T>(local, length, id, scratch);
           r.workitem_get_from(aI);
           r.combine_threads(bop);
@@ -90,11 +90,11 @@ typename std::iterator_traits<Iterator>::value_type reduce(
   do {
     q.submit(f);
     length = length / local;
-    ndRange = cl::sycl::nd_range<1>{cl::sycl::range<1>(std::max(length, local)),
+    ndRange = sycl::nd_range<1>{sycl::range<1>(std::max(length, local)),
                                     ndRange.get_local_range()};
   } while (length > 1);
   q.wait_and_throw();
-  auto hI = bufI.template get_access<cl::sycl::access::mode::read>();
+  auto hI = bufI.template get_access<sycl::access::mode::read>();
   return bop(hI[0], init);
 }
 #else

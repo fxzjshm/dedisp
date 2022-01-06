@@ -48,7 +48,7 @@ template <class ExecutionPolicy, class ForwardIt1, class ForwardIt2,
 ForwardIt2 replace_copy_if(ExecutionPolicy &sep, ForwardIt1 first,
                            ForwardIt1 last, ForwardIt2 d_first,
                            UnaryPredicate p, const T &new_value) {
-  cl::sycl::queue q{sep.get_queue()};
+  sycl::queue q{sep.get_queue()};
   const auto device = q.get_device();
   auto bufI = helpers::make_buffer(first, last);
 
@@ -62,12 +62,12 @@ ForwardIt2 replace_copy_if(ExecutionPolicy &sep, ForwardIt1 first,
   const auto ndRange = sep.calculateNdRange(vectorSize);
 
   const auto f = [vectorSize, p, new_val, ndRange, &bufI,
-            &bufO](cl::sycl::handler &h) mutable {
+            &bufO](sycl::handler &h) mutable {
 
-    const auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
-    const auto aO = bufO.template get_access<cl::sycl::access::mode::write>(h);
+    const auto aI = bufI.template get_access<sycl::access::mode::read>(h);
+    const auto aO = bufO.template get_access<sycl::access::mode::write>(h);
     h.parallel_for(
-        ndRange, [aI, aO, vectorSize, p, new_val](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, aO, vectorSize, p, new_val](sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           const auto orig_value = aI[global_id];
           if (global_id < vectorSize) {

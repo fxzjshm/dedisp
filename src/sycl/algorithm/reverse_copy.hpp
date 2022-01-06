@@ -46,7 +46,7 @@ namespace impl {
 template <class ExecutionPolicy, class BidirIt, class ForwardIt>
 ForwardIt reverse_copy(ExecutionPolicy &sep, BidirIt first, BidirIt last,
                        ForwardIt d_first) {
-  cl::sycl::queue q{sep.get_queue()};
+  sycl::queue q{sep.get_queue()};
   const auto device = q.get_device();
 
   auto bufI = helpers::make_buffer(first, last);
@@ -56,11 +56,11 @@ ForwardIt reverse_copy(ExecutionPolicy &sep, BidirIt first, BidirIt last,
   const auto vectorSize = bufI.get_count();
   const auto ndRange = sep.calculateNdRange(vectorSize);
   const auto f = [vectorSize, ndRange, &bufI,
-            &bufO](cl::sycl::handler &h) mutable {
-    const auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
-    const auto aO = bufO.template get_access<cl::sycl::access::mode::write>(h);
+            &bufO](sycl::handler &h) mutable {
+    const auto aI = bufI.template get_access<sycl::access::mode::read>(h);
+    const auto aO = bufO.template get_access<sycl::access::mode::write>(h);
     h.parallel_for(
-        ndRange, [aI, aO, vectorSize](cl::sycl::nd_item<1> id) {
+        ndRange, [aI, aO, vectorSize](sycl::nd_item<1> id) {
           const auto global_id = id.get_global_id(0);
           if (global_id < vectorSize) {
             aO[global_id] = aI[vectorSize - global_id - 1];

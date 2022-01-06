@@ -68,7 +68,7 @@ struct sycl_algorithm_descriptor {
  * Compute a valid set of parameters for buffer_mapreduce algorithm to
  * work properly
  */
-sycl_algorithm_descriptor compute_mapreduce_descriptor(cl::sycl::device device,
+sycl_algorithm_descriptor compute_mapreduce_descriptor(sycl::device device,
                                                   size_t size,
                                                   size_t sizeofB) {
   using std::max;
@@ -85,16 +85,16 @@ sycl_algorithm_descriptor compute_mapreduce_descriptor(cl::sycl::device device,
    *  - every work group do something
    */
   size_t max_work_group =
-    device.get_info<cl::sycl::info::device::max_compute_units>();
+    device.get_info<sycl::info::device::max_compute_units>();
 
-  const cl::sycl::id<3>max_work_item_sizes =
-    device.get_info<cl::sycl::info::device::max_work_item_sizes>();
+  const sycl::id<3>max_work_item_sizes =
+    device.get_info<sycl::info::device::max_work_item_sizes>();
   const auto max_work_item = min(
-    device.get_info<cl::sycl::info::device::max_work_group_size>(),
+    device.get_info<sycl::info::device::max_work_group_size>(),
     max_work_item_sizes[0]);
 
   size_t local_mem_size =
-    device.get_info<cl::sycl::info::device::local_mem_size>();
+    device.get_info<sycl::info::device::local_mem_size>();
 
   size_t nb_work_item = min(max_work_item, local_mem_size / sizeofB);
 
@@ -153,8 +153,8 @@ template <typename ExecutionPolicy,
           typename Reduce,
           typename Map>
 B buffer_mapreduce(ExecutionPolicy &snp,
-                   cl::sycl::queue q,
-                   cl::sycl::buffer<A, 1> input_buff,
+                   sycl::queue q,
+                   sycl::buffer<A, 1> input_buff,
                    B init, //map is not applied on init
                    sycl_algorithm_descriptor d,
                    Map map,
@@ -168,7 +168,7 @@ B buffer_mapreduce(ExecutionPolicy &snp,
 
   if ((d.nb_work_item == 0) || (d.nb_work_group == 0)) {
     auto read_input = input_buff.template get_access
-      <cl::sycl::access::mode::read>();
+      <sycl::access::mode::read>();
     B acc = init;
     for (size_t pos = 0; pos < d.size; pos++)
       acc = reduce(acc, map(pos, read_input[pos]));
@@ -179,26 +179,26 @@ B buffer_mapreduce(ExecutionPolicy &snp,
   using std::min;
   using std::max;
 
-  cl::sycl::buffer<B, 1> output_buff { cl::sycl::range<1> { d.nb_work_group } };
+  sycl::buffer<B, 1> output_buff { sycl::range<1> { d.nb_work_group } };
 
-  q.submit([&] (cl::sycl::handler &cgh) {
-    cl::sycl::range<1> rg { d.nb_work_group * d.nb_work_item };
-    cl::sycl::range<1> ri { d.nb_work_item };
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::range<1> rg { d.nb_work_group * d.nb_work_item };
+    sycl::range<1> ri { d.nb_work_item };
     auto input = input_buff.template get_access
-      <cl::sycl::access::mode::read>(cgh);
+      <sycl::access::mode::read>(cgh);
     auto output = output_buff.template get_access
-      <cl::sycl::access::mode::write>(cgh);
-    cl::sycl::accessor<B, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>
-      sum { cl::sycl::range<1>(d.nb_work_item), cgh };
-    cgh.parallel_for_work_group<typename ExecutionPolicy::kernelName>(rg, ri, [=](cl::sycl::group<1> grp) {
+      <sycl::access::mode::write>(cgh);
+    sycl::accessor<B, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+      sum { sycl::range<1>(d.nb_work_item), cgh };
+    cgh.parallel_for_work_group<typename ExecutionPolicy::kernelName>(rg, ri, [=](sycl::group<1> grp) {
       size_t group_id = grp.get_id(0);
       //assert(group_id < d.nb_work_group);
       size_t group_begin = group_id * d.size_per_work_group;
       size_t group_end   = min((group_id+1) * d.size_per_work_group, d.size);
       //assert(group_begin < group_end); //< as we properly selected the
                                        //  number of work_group
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id = id.get_local_id(0);
         size_t local_pos = group_begin + local_id;
         if (local_pos < group_end) {
@@ -222,7 +222,7 @@ B buffer_mapreduce(ExecutionPolicy &snp,
     });
   });
   auto read_output = output_buff.template get_access
-    <cl::sycl::access::mode::read>();
+    <sycl::access::mode::read>();
 
   B acc = init;
   for (size_t pos0 = 0; pos0 < d.nb_work_group; pos0++) {
@@ -247,9 +247,9 @@ template <typename ExecutionPolicy,
           typename Reduce,
           typename Map>
 B buffer_map2reduce(ExecutionPolicy &snp,
-                    cl::sycl::queue q,
-                    cl::sycl::buffer<A1, 1> input_buff1,
-                    cl::sycl::buffer<A2, 1> input_buff2,
+                    sycl::queue q,
+                    sycl::buffer<A1, 1> input_buff1,
+                    sycl::buffer<A2, 1> input_buff2,
                     B init, //map is not applied on init
                     sycl_algorithm_descriptor d,
                     Map map,
@@ -257,9 +257,9 @@ B buffer_map2reduce(ExecutionPolicy &snp,
 
   if ((d.nb_work_item == 0) || (d.nb_work_group == 0)) {
     auto read_input1 = input_buff1.template get_access
-      <cl::sycl::access::mode::read>();
+      <sycl::access::mode::read>();
     auto read_input2 = input_buff2.template get_access
-      <cl::sycl::access::mode::read>();
+      <sycl::access::mode::read>();
     B acc = init;
     for (size_t pos = 0; pos < d.size; pos++)
       acc = reduce(acc, map(pos, read_input1[pos], read_input2[pos]));
@@ -270,30 +270,30 @@ B buffer_map2reduce(ExecutionPolicy &snp,
   using std::min;
   using std::max;
 
-  cl::sycl::buffer<B, 1> output_buff { cl::sycl::range<1> { d.nb_work_group } };
+  sycl::buffer<B, 1> output_buff { sycl::range<1> { d.nb_work_group } };
 
-  q.submit([&] (cl::sycl::handler &cgh) {
-    cl::sycl::nd_range<1> rng
-      { cl::sycl::range<1>{ d.nb_work_group * d.nb_work_item },
-        cl::sycl::range<1>{ d.nb_work_item } };
+  q.submit([&] (sycl::handler &cgh) {
+    sycl::nd_range<1> rng
+      { sycl::range<1>{ d.nb_work_group * d.nb_work_item },
+        sycl::range<1>{ d.nb_work_item } };
     auto input1  = input_buff1.template get_access
-      <cl::sycl::access::mode::read>(cgh);
+      <sycl::access::mode::read>(cgh);
     auto input2  = input_buff2.template get_access
-      <cl::sycl::access::mode::read>(cgh);
+      <sycl::access::mode::read>(cgh);
     auto output = output_buff.template get_access
-      <cl::sycl::access::mode::write>(cgh);
-    cl::sycl::accessor<B, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>
-      sum { cl::sycl::range<1>(d.nb_work_item), cgh };
+      <sycl::access::mode::write>(cgh);
+    sycl::accessor<B, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+      sum { sycl::range<1>(d.nb_work_item), cgh };
     cgh.parallel_for_work_group<typename ExecutionPolicy::kernelName>(
-        rng.get_global_range(), rng.get_local_range(), [=](cl::sycl::group<1> grp) {
+        rng.get_global_range(), rng.get_local_range(), [=](sycl::group<1> grp) {
       size_t group_id = grp.get_id(0);
       //assert(group_id < d.nb_work_group);
       size_t group_begin = group_id * d.size_per_work_group;
       size_t group_end = min((group_id+1) * d.size_per_work_group, d.size);
       //assert(group_begin < group_end); // as we properly selected the
                                          // number of work_group
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id = id.get_local_id(0);
         size_t local_pos = group_begin + local_id;
         if (local_pos < group_end) {
@@ -317,7 +317,7 @@ B buffer_map2reduce(ExecutionPolicy &snp,
     });
   });
   auto read_output  = output_buff.template get_access
-    <cl::sycl::access::mode::read>();
+    <sycl::access::mode::read>();
 
   B acc = init;
   for (size_t pos0 = 0; pos0 < d.nb_work_group; pos0++)
@@ -328,7 +328,7 @@ B buffer_map2reduce(ExecutionPolicy &snp,
 
 
 
-sycl_algorithm_descriptor compute_mapscan_descriptor(cl::sycl::device device,
+sycl_algorithm_descriptor compute_mapscan_descriptor(sycl::device device,
                                               size_t size,
                                               size_t sizeofB) {
   using std::min;
@@ -336,17 +336,17 @@ sycl_algorithm_descriptor compute_mapscan_descriptor(cl::sycl::device device,
   if (size == 0)
     return sycl_algorithm_descriptor {};
   size_t local_mem_size =
-    device.get_info<cl::sycl::info::device::local_mem_size>();
+    device.get_info<sycl::info::device::local_mem_size>();
   size_t size_per_work_group = min(size, local_mem_size / sizeofB);
   if (size_per_work_group <= 0)
     return sycl_algorithm_descriptor { size };
 
   size_t nb_work_group = up_rounded_division(size, size_per_work_group);
 
-  const cl::sycl::id<3> max_work_item_sizes =
-    device.get_info<cl::sycl::info::device::max_work_item_sizes>();
+  const sycl::id<3> max_work_item_sizes =
+    device.get_info<sycl::info::device::max_work_item_sizes>();
   const auto max_work_item = min(
-    device.get_info<cl::sycl::info::device::max_work_group_size>(),
+    device.get_info<sycl::info::device::max_work_group_size>(),
     max_work_item_sizes[0]);
   size_t nb_work_item = min(max_work_item, size_per_work_group);
   size_t size_per_work_item =
@@ -362,9 +362,9 @@ sycl_algorithm_descriptor compute_mapscan_descriptor(cl::sycl::device device,
 
 template <class ExecutionPolicy, class A, class B, class Reduce, class Map>
 void buffer_mapscan(ExecutionPolicy &snp,
-                    cl::sycl::queue q,
-                    cl::sycl::buffer<A, 1> input_buffer,
-                    cl::sycl::buffer<B, 1> output_buffer,
+                    sycl::queue q,
+                    sycl::buffer<A, 1> input_buffer,
+                    sycl::buffer<B, 1> output_buffer,
                     B init,
                     sycl_algorithm_descriptor d,
                     Map map,
@@ -376,23 +376,23 @@ void buffer_mapscan(ExecutionPolicy &snp,
 
   //WARNING: nb_work_group is not bounded by max_compute_units
   auto scan = sycl_pstl::helpers::make_temp_buffer<B>( d.nb_work_group );
-  //cl::sycl::buffer<B, 1> scan = { cl::sycl::range<1> { d.nb_work_group } };
-  cl::sycl::range<1> rng_wg {d.nb_work_group * d.nb_work_item};
-  cl::sycl::range<1> rng_wi {d.nb_work_item};
+  //sycl::buffer<B, 1> scan = { sycl::range<1> { d.nb_work_group } };
+  sycl::range<1> rng_wg {d.nb_work_group * d.nb_work_item};
+  sycl::range<1> rng_wi {d.nb_work_item};
 
-  q.submit([&] (cl::sycl::handler &cgh) {
+  q.submit([&] (sycl::handler &cgh) {
     auto input =
-      input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
+      input_buffer.template get_access<sycl::access::mode::read>(cgh);
     auto output =
-      output_buffer.template get_access<cl::sycl::access::mode::write>(cgh);
+      output_buffer.template get_access<sycl::access::mode::write>(cgh);
 
-    cl::sycl::accessor<B, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>
-      scratch { cl::sycl::range<1> { d.size_per_work_group }, cgh };
+    sycl::accessor<B, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
+      scratch { sycl::range<1> { d.size_per_work_group }, cgh };
 
 
-    cgh.parallel_for_work_group<cl::sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(rng_wg, rng_wi,
-                                          [=](cl::sycl::group<1> grp) {
+    cgh.parallel_for_work_group(rng_wg, rng_wi,
+                                          [=](sycl::group<1> grp) {
       size_t group_id = grp.get_id(0);
       size_t group_begin = group_id * d.size_per_work_group;
       size_t group_end   = min((group_id+1) * d.size_per_work_group, d.size);
@@ -401,7 +401,7 @@ void buffer_mapscan(ExecutionPolicy &snp,
       // Step 0:
       // each work_item copy a piece of data
       // map is applied during the process
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id  = id.get_local_id(0);
         // gpos: position in the global vector
         // lpos: position in the local vector
@@ -414,7 +414,7 @@ void buffer_mapscan(ExecutionPolicy &snp,
 
       // Step 1:
       // each work_item scan a piece of data
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id  = id.get_local_id(0);
         size_t local_pos = local_id * d.size_per_work_item;
         size_t local_end = min((local_id+1) * d.size_per_work_item, local_size);
@@ -445,7 +445,7 @@ void buffer_mapscan(ExecutionPolicy &snp,
 
       // Step 3:
       // (except for group = 0) add the last element of the previous block
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id  = id.get_local_id(0);
         if (local_id > 0) {
           size_t local_pos = local_id * d.size_per_work_item;
@@ -462,7 +462,7 @@ void buffer_mapscan(ExecutionPolicy &snp,
 
       // Step 4:
       // each work_item copy a piece of data
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id = id.get_local_id(0);
         // lpos: position in the local vector
         for (size_t gpos = group_begin + local_id, lpos = local_id;
@@ -478,9 +478,9 @@ void buffer_mapscan(ExecutionPolicy &snp,
   // STEP II: global scan
   {
     auto buff  = output_buffer.template get_access
-      <cl::sycl::access::mode::read_write>();
+      <sycl::access::mode::read_write>();
     auto write_scan  = scan.template get_access
-      <cl::sycl::access::mode::write>();
+      <sycl::access::mode::write>();
     B acc = init;
     for (size_t global_pos = d.size_per_work_group - 1, local_pos = 0;
         local_pos < d.nb_work_group - 1;
@@ -493,13 +493,13 @@ void buffer_mapscan(ExecutionPolicy &snp,
 
 
   // STEP III: propagate global scan on local scans
-  q.submit([&] (cl::sycl::handler &cgh) {
+  q.submit([&] (sycl::handler &cgh) {
     auto buff = output_buffer.template get_access
-      <cl::sycl::access::mode::read_write>(cgh);
+      <sycl::access::mode::read_write>(cgh);
     auto read_scan = scan.template get_access
-      <cl::sycl::access::mode::read>(cgh);
-    cgh.parallel_for_work_group<cl::sycl::helpers::NameGen<1, typename ExecutionPolicy::kernelName>>(rng_wg, rng_wi,
-                                          [=](cl::sycl::group<1> grp) {
+      <sycl::access::mode::read>(cgh);
+    cgh.parallel_for_work_group(rng_wg, rng_wi,
+                                          [=](sycl::group<1> grp) {
       size_t group_id = grp.get_id(0);
       B acc = read_scan[group_id];
       //assert(group_id < d.nb_work_group);
@@ -508,7 +508,7 @@ void buffer_mapscan(ExecutionPolicy &snp,
       //assert(group_begin < group_end); //  as we properly selected the
                                          //  number of work_group
 
-      grp.parallel_for_work_item([&](cl::sycl::h_item<1> id) {
+      grp.parallel_for_work_item([&](sycl::h_item<1> id) {
         size_t local_id = id.get_local_id(0);
         // gpos: position in the global vector
         // lpos: position in the local vector
@@ -527,18 +527,16 @@ void buffer_mapscan(ExecutionPolicy &snp,
 
 template <class BaseKernelName, class InT1, class InT2, class OutT, class IndexT,
           class BinaryOperation1, class BinaryOperation2>
-OutT inner_product_sequential_sycl(cl::sycl::queue q, cl::sycl::buffer<InT1, 1> input_buff1,
-                                   cl::sycl::buffer<InT2, 1> input_buff2, OutT value,
+OutT inner_product_sequential_sycl(sycl::queue q, sycl::buffer<InT1, 1> input_buff1,
+                                   sycl::buffer<InT2, 1> input_buff2, OutT value,
                                    IndexT size, BinaryOperation1 op1, BinaryOperation2 op2) {
   {
-    cl::sycl::buffer<OutT, 1> output_buff(&value, cl::sycl::range<1>(1));
-    using KernelName = cl::sycl::helpers::NameGen<0, BaseKernelName,
-                                                  BinaryOperation1, BinaryOperation2>;
-    q.submit([&](cl::sycl::handler& cgh) {
-      auto input1 = input_buff1.template get_access<cl::sycl::access::mode::read>(cgh);
-      auto input2 = input_buff2.template get_access<cl::sycl::access::mode::read>(cgh);
-      auto output = output_buff.template get_access<cl::sycl::access::mode::read_write>(cgh);
-      cgh.single_task<KernelName>([=]() {
+    sycl::buffer<OutT, 1> output_buff(&value, sycl::range<1>(1));
+    q.submit([&](sycl::handler& cgh) {
+      auto input1 = input_buff1.template get_access<sycl::access::mode::read>(cgh);
+      auto input2 = input_buff2.template get_access<sycl::access::mode::read>(cgh);
+      auto output = output_buff.template get_access<sycl::access::mode::read_write>(cgh);
+      cgh.single_task([=]() {
         for (auto i = 0; i < size; ++i) {
           output[0] = op1(output[0], op2(input1[i], input2[i]));
         }

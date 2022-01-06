@@ -39,16 +39,20 @@
 #include <cstring>
 #include <algorithm>
 
+#if __has_include(<sycl/sycl.hpp>)
+#include <sycl/sycl.hpp>
+#else
 #include <CL/sycl.hpp>
+#endif
 
 namespace sycl_pstl {
 namespace helpers {
 
-template <typename T, cl::sycl::access::mode Mode>
+template <typename T, sycl::access::mode Mode>
 using sycl_host_acc =
-    cl::sycl::accessor<T, 1, Mode, cl::sycl::access::target::host_buffer>;
+    sycl::accessor<T, 1, Mode, sycl::access::target::host_buffer>;
 template <typename T, typename Alloc>
-using sycl_buffer_1d = cl::sycl::buffer<T, 1, Alloc>;
+using sycl_buffer_1d = sycl::buffer<T, 1, Alloc>;
 
 class SyclIterator {
  protected:
@@ -69,7 +73,7 @@ struct host_accessor_iterator_tag {};
  * Iterator that access sycl-handled memory objects from
  * the host via a host accessor
  */
-template <typename T, cl::sycl::access::mode Mode>
+template <typename T, sycl::access::mode Mode>
 class HostAccessorIterator : public SyclIterator {
  private:
   sycl_host_acc<T, Mode> h_;
@@ -86,7 +90,7 @@ class HostAccessorIterator : public SyclIterator {
   HostAccessorIterator(sycl_host_acc<T, Mode> &h, size_t pos)
       : SyclIterator(pos), h_(h) {}
 
-  template <typename U, cl::sycl::access::mode ModeU>
+  template <typename U, sycl::access::mode ModeU>
   HostAccessorIterator(const HostAccessorIterator<U, ModeU> &hI)
       : SyclIterator(hI.get_pos()), h_(hI.h_) {}
 
@@ -240,12 +244,12 @@ inline bool operator!=(SyclIterator a, SyclIterator b) {
   return !(a == b);
 }
 
-template <typename T, cl::sycl::access::mode Mode>
+template <typename T, sycl::access::mode Mode>
 HostAccessorIterator<T, Mode> begin(sycl_host_acc<T, Mode> &h) {
   return HostAccessorIterator<T, Mode>(h, 0);
 }
 
-template <typename T, cl::sycl::access::mode Mode>
+template <typename T, sycl::access::mode Mode>
 HostAccessorIterator<T, Mode> end(sycl_host_acc<T, Mode> &h) {
   return HostAccessorIterator<T, Mode>(h, h.get_count());
 }

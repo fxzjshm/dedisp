@@ -55,14 +55,14 @@ template <class ExecutionPolicy, class InputIterator, class UnaryOperation,
 T transform_reduce(ExecutionPolicy& exec, InputIterator first,
                    InputIterator last, UnaryOperation unary_op, T init,
                    BinaryOperation binary_op) {
-  cl::sycl::queue q(exec.get_queue());
+  sycl::queue q(exec.get_queue());
   auto vectorSize = sycl_pstl::helpers::distance(first, last);
   
   if (vectorSize < 1) {
     return init;
   }
 
-  cl::sycl::buffer<T, 1> bufR((cl::sycl::range<1>(vectorSize)));
+  sycl::buffer<T, 1> bufR((sycl::range<1>(vectorSize)));
 
   auto device = q.get_device();
   auto bufI = sycl_pstl::helpers::make_const_buffer(first, last);
@@ -73,16 +73,16 @@ T transform_reduce(ExecutionPolicy& exec, InputIterator first,
 
   do {
     auto f = [passes, length, ndRange, local, &bufI, &bufR, unary_op, binary_op](
-        cl::sycl::handler& h) mutable {
-      auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
-      auto aR = bufR.template get_access<cl::sycl::access::mode::read_write>(h);
-      cl::sycl::accessor<T, 1, cl::sycl::access::mode::read_write,
-                         cl::sycl::access::target::local>
+        sycl::handler& h) mutable {
+      auto aI = bufI.template get_access<sycl::access::mode::read>(h);
+      auto aR = bufR.template get_access<sycl::access::mode::read_write>(h);
+      sycl::accessor<T, 1, sycl::access::mode::read_write,
+                         sycl::access::target::local>
           scratch(ndRange.get_local_range(), h);
 
       h.parallel_for(
           ndRange, [aI, aR, scratch, passes, local, length, unary_op, binary_op](
-                 cl::sycl::nd_item<1> id) {
+                 sycl::nd_item<1> id) {
             auto r = ReductionStrategy<T>(local, length, id, scratch);
             if (passes == 0) {
               r.workitem_get_from(unary_op, aI);
@@ -96,11 +96,11 @@ T transform_reduce(ExecutionPolicy& exec, InputIterator first,
     q.submit(f);
     passes++;
     length = length / local;
-    ndRange = cl::sycl::nd_range<1>{cl::sycl::range<1>(std::max(length, local)),
+    ndRange = sycl::nd_range<1>{sycl::range<1>(std::max(length, local)),
                                     ndRange.get_local_range()};
   } while (length > 1);
   q.wait_and_throw();
-  auto hR = bufR.template get_access<cl::sycl::access::mode::read>();
+  auto hR = bufR.template get_access<sycl::access::mode::read>();
   return binary_op(hR[0], init);
 }
 

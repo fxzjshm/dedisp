@@ -71,11 +71,11 @@ namespace helpers {
 template <typename Iterator,
           typename std::enable_if<
               !std::is_base_of<SyclIterator, Iterator>::value>::type* = nullptr>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
 make_buffer_impl(Iterator b, Iterator e, std::random_access_iterator_tag) {
   typedef typename std::iterator_traits<Iterator>::value_type type_;
 #ifdef TRISYCL_CL_LANGUAGE_VERSION
-  cl::sycl::buffer<type_, 1> buf { b, e };
+  sycl::buffer<type_, 1> buf { b, e };
   buf.set_final_data(b);
 #else
   size_t bufferSize = std::distance(b, e);
@@ -88,7 +88,7 @@ make_buffer_impl(Iterator b, Iterator e, std::random_access_iterator_tag) {
     delete[] ptr;
   }};
   std::copy(b, e, up.get());
-  cl::sycl::buffer<type_, 1> buf(up, cl::sycl::range<1>(bufferSize));
+  sycl::buffer<type_, 1> buf(up, sycl::range<1>(bufferSize));
   buf.set_final_data(up);
 #endif
   return buf;
@@ -107,10 +107,10 @@ template <typename Iterator,
           typename std::enable_if<
               !std::is_base_of<SyclIterator, Iterator>::value>::type* =
                                              nullptr>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
 make_buffer_impl(Iterator b, Iterator e, std::input_iterator_tag) {
   using type_= typename std::iterator_traits<Iterator>::value_type;
-  cl::sycl::buffer<type_, 1> buf { b ,e };
+  sycl::buffer<type_, 1> buf { b ,e };
   buf.set_final_data(nullptr);
   return buf;
 }
@@ -124,7 +124,7 @@ make_buffer_impl(Iterator b, Iterator e, std::input_iterator_tag) {
  * @param std::input_iterator_tag Used for iterator dispatch only
  */
 template <typename Iterator>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
                  typename Iterator::allocator_type>
 reuse_buffer_impl(Iterator b, Iterator e, std::input_iterator_tag) {
   // TODO: This may need to create a sub-buffer if the range does not match
@@ -142,7 +142,7 @@ reuse_buffer_impl(Iterator b, Iterator e, std::input_iterator_tag) {
  * @param std::input_iterator_tag Used for iterator dispatch only
  */
 template <typename Iterator>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
                  typename Iterator::allocator_type>
 reuse_buffer_impl(Iterator b, Iterator e, std::random_access_iterator_tag) {
   // TODO: This may need to create a sub-buffer if the range does not match
@@ -159,7 +159,7 @@ reuse_buffer_impl(Iterator b, Iterator e, std::random_access_iterator_tag) {
  */
 template <class Iterator, typename std::enable_if<std::is_base_of<
                               SyclIterator, Iterator>::value>::type* = nullptr>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
                  typename Iterator::allocator_type>
 make_buffer(Iterator b, Iterator e) {
   return reuse_buffer_impl(
@@ -175,7 +175,7 @@ make_buffer(Iterator b, Iterator e) {
 template <class Iterator,
           typename std::enable_if<
               !std::is_base_of<SyclIterator, Iterator>::value>::type* = nullptr>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
 make_buffer(Iterator b, Iterator e) {
   return make_buffer_impl(
       b, e, typename std::iterator_traits<Iterator>::iterator_category());
@@ -188,7 +188,7 @@ make_buffer(Iterator b, Iterator e) {
  */
 template <class Iterator, typename std::enable_if<std::is_base_of<
                               SyclIterator, Iterator>::value>::type* = nullptr>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1,
                  typename Iterator::allocator_type>
 make_const_buffer(Iterator b, Iterator e) {
   return reuse_buffer_impl(b, e, std::input_iterator_tag());
@@ -202,7 +202,7 @@ make_const_buffer(Iterator b, Iterator e) {
 template <class Iterator,
           typename std::enable_if<
               !std::is_base_of<SyclIterator, Iterator>::value>::type* = nullptr>
-cl::sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
+sycl::buffer<typename std::iterator_traits<Iterator>::value_type, 1>
 make_const_buffer(Iterator b, Iterator e) {
   return make_buffer_impl(b, e, std::input_iterator_tag());
 }
@@ -212,8 +212,8 @@ make_const_buffer(Iterator b, Iterator e) {
  * @param size_t size
  */
 template <class ElemT>
-cl::sycl::buffer<ElemT, 1> make_temp_buffer(size_t size) {
-  cl::sycl::buffer<ElemT, 1> buf((cl::sycl::range<1>(size)));
+sycl::buffer<ElemT, 1> make_temp_buffer(size_t size) {
+  sycl::buffer<ElemT, 1> buf((sycl::range<1>(size)));
 #ifndef TRISYCL_CL_LANGUAGE_VERSION
   buf.set_final_data(nullptr);
 #endif

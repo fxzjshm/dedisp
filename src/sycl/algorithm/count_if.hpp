@@ -54,7 +54,7 @@ template <class ExecutionPolicy, class InputIterator, class UnaryOperation,
 typename std::iterator_traits<InputIterator>::difference_type count_if(
     ExecutionPolicy& exec, InputIterator first, InputIterator last,
     UnaryOperation unary_op, BinaryOperation binary_op) {
-  cl::sycl::queue q(exec.get_queue());
+  sycl::queue q(exec.get_queue());
   auto vectorSize = sycl_pstl::helpers::distance(first, last);
   typename std::iterator_traits<InputIterator>::difference_type ret = 0;
 
@@ -64,23 +64,23 @@ typename std::iterator_traits<InputIterator>::difference_type count_if(
 
   auto device = q.get_device();
   auto bufI = sycl_pstl::helpers::make_const_buffer(first, last);
-  cl::sycl::buffer<int, 1> bufR((cl::sycl::range<1>(vectorSize)));
+  sycl::buffer<int, 1> bufR((sycl::range<1>(vectorSize)));
   auto length = vectorSize;
   auto ndRange = exec.calculateNdRange(vectorSize);
   const auto local = ndRange.get_local_range()[0];
   int passes = 0;
 
   auto f = [&passes, &length, &ndRange, local, &bufI, &bufR, unary_op, binary_op](
-      cl::sycl::handler& h) mutable {
-    auto aI = bufI.template get_access<cl::sycl::access::mode::read>(h);
-    auto aR = bufR.template get_access<cl::sycl::access::mode::read_write>(h);
-    cl::sycl::accessor<int, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>
+      sycl::handler& h) mutable {
+    auto aI = bufI.template get_access<sycl::access::mode::read>(h);
+    auto aR = bufR.template get_access<sycl::access::mode::read_write>(h);
+    sycl::accessor<int, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
         scratch(ndRange.get_local_range(), h);
 
     h.parallel_for(
         ndRange, [aI, aR, scratch, passes, local, length, unary_op, binary_op](
-               cl::sycl::nd_item<1> id) {
+               sycl::nd_item<1> id) {
           auto r = ReductionStrategy<int>(local, length, id, scratch);
           if (passes == 0) {
             r.workitem_get_from(unary_op, aI);
@@ -94,12 +94,12 @@ typename std::iterator_traits<InputIterator>::difference_type count_if(
   do {
     q.submit(f);
     length = length / local;
-    ndRange = cl::sycl::nd_range<1>{cl::sycl::range<1>(std::max(length, local)),
+    ndRange = sycl::nd_range<1>{sycl::range<1>(std::max(length, local)),
                                     ndRange.get_local_range()};
     passes++;
   } while (length > 1);
   q.wait_and_throw();
-  auto hr = bufR.template get_access<cl::sycl::access::mode::read>();
+  auto hr = bufR.template get_access<sycl::access::mode::read>();
   return hr[0];
 }
 

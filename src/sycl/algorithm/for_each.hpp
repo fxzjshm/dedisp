@@ -46,16 +46,16 @@ namespace impl {
 template <class ExecutionPolicy, class Iterator, class UnaryFunction>
 void for_each(ExecutionPolicy &sep, Iterator b, Iterator e, UnaryFunction op) {
   {
-    cl::sycl::queue q(sep.get_queue());
+    sycl::queue q(sep.get_queue());
     auto device = q.get_device();
     auto bufI = sycl_pstl::helpers::make_buffer(b, e);
     auto vectorSize = bufI.get_count();
     const auto ndRange = sep.calculateNdRange(vectorSize);
     auto f = [vectorSize, ndRange, &bufI, op](
-        cl::sycl::handler &h) mutable {
-      auto aI = bufI.template get_access<cl::sycl::access::mode::read_write>(h);
+        sycl::handler &h) mutable {
+      auto aI = bufI.template get_access<sycl::access::mode::read_write>(h);
       h.parallel_for(
-          ndRange, [aI, op, vectorSize](cl::sycl::nd_item<1> id) {
+          ndRange, [aI, op, vectorSize](sycl::nd_item<1> id) {
             if (id.get_global_id(0) < vectorSize) {
               op(aI[id.get_global_id(0)]);
             }

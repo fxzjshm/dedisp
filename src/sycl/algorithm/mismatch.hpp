@@ -53,7 +53,7 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
                                            ForwardIt1 first1, ForwardIt1 last1,
                                            ForwardIt2 first2, ForwardIt2 last2,
                                            BinaryPredicate p) {
-  cl::sycl::queue q(exec.get_queue());
+  sycl::queue q(exec.get_queue());
   const auto size1 = sycl_pstl::helpers::distance(first1, last1);
   const auto size2 = sycl_pstl::helpers::distance(first2, last2);
 
@@ -70,17 +70,17 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
   auto buf1 = sycl_pstl::helpers::make_const_buffer(first1, first1 + length);
   auto buf2 = sycl_pstl::helpers::make_const_buffer(first2, first2 + length);
 
-  cl::sycl::buffer<std::size_t, 1> bufR((cl::sycl::range<1>(size1)));
+  sycl::buffer<std::size_t, 1> bufR((sycl::range<1>(size1)));
 
   // map across the input testing whether they match the predicate
   const auto eqf = [length, ndRange, &buf1, &buf2, &bufR,
-                    p](cl::sycl::handler& h) {
-    const auto a1 = buf1.template get_access<cl::sycl::access::mode::read>(h);
-    const auto a2 = buf2.template get_access<cl::sycl::access::mode::read>(h);
-    const auto aR = bufR.template get_access<cl::sycl::access::mode::write>(h);
+                    p](sycl::handler& h) {
+    const auto a1 = buf1.template get_access<sycl::access::mode::read>(h);
+    const auto a2 = buf2.template get_access<sycl::access::mode::read>(h);
+    const auto aR = bufR.template get_access<sycl::access::mode::write>(h);
     h.parallel_for<
-        cl::sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(
-        ndRange, [a1, a2, aR, length, p](cl::sycl::nd_item<1> id) {
+        sycl::helpers::NameGen<0, typename ExecutionPolicy::kernelName> >(
+        ndRange, [a1, a2, aR, length, p](sycl::nd_item<1> id) {
           const auto m_id = id.get_global_id(0);
 
           if (m_id < length) {
@@ -94,21 +94,21 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
   int passes = 0;
 
   const auto f = [&passes, &current_length, &ndRange, local,
-                  &bufR](cl::sycl::handler& h) mutable {
+                  &bufR](sycl::handler& h) mutable {
     const auto aR =
-        bufR.template get_access<cl::sycl::access::mode::read_write>(h);
-    cl::sycl::accessor<std::size_t, 1, cl::sycl::access::mode::read_write,
-                       cl::sycl::access::target::local>
+        bufR.template get_access<sycl::access::mode::read_write>(h);
+    sycl::accessor<std::size_t, 1, sycl::access::mode::read_write,
+                       sycl::access::target::local>
         scratch(ndRange.get_local_range(), h);
 
     h.parallel_for(
         ndRange, [aR, scratch, passes, local,
-            current_length](cl::sycl::nd_item<1> id) {
+            current_length](sycl::nd_item<1> id) {
           auto r = ReductionStrategy<std::size_t>(local, current_length, id,
                                                   scratch);
           r.workitem_get_from(aR);
           r.combine_threads([](std::size_t x, std::size_t y) {
-            return cl::sycl::min(x, y);
+            return sycl::min(x, y);
           });
           r.workgroup_write_to(aR);
         });
@@ -117,12 +117,12 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
     q.submit(f);
     ++passes;
     current_length = current_length / local;
-    ndRange = cl::sycl::nd_range<1>{cl::sycl::range<1>(std::max(current_length, local)),
+    ndRange = sycl::nd_range<1>{sycl::range<1>(std::max(current_length, local)),
                                     ndRange.get_local_range()};
   } while (current_length > 1);
   q.wait_and_throw();
-  const auto hR = bufR.get_access<cl::sycl::access::mode::read>(
-      cl::sycl::range<1>{1}, cl::sycl::id<1>{0});
+  const auto hR = bufR.get_access<sycl::access::mode::read>(
+      sycl::range<1>{1}, sycl::id<1>{0});
 
   const auto mismatch_id = hR[0];
   return std::make_pair(first1 + mismatch_id, first2 + mismatch_id);
@@ -165,7 +165,7 @@ std::pair<ForwardIt1, ForwardIt2> mismatch(ExecutionPolicy& exec,
         return p(x, y) ? length : pos;
       },
       [](const std::size_t x, const std::size_t y) {
-        return cl::sycl::min(x, y);
+        return sycl::min(x, y);
       });
 
   return std::make_pair(std::next(first1, pos), std::next(first2, pos));
