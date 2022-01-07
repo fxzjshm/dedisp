@@ -21,8 +21,8 @@ GPU_ARCH   ?= sm_30
 #SYCL_FLAGS ?=
 
 # hipSYCL syclcc
-#SYCLCC     ?= /opt/hipSYCL/bin/syclcc
-#SYCL_FLAGS ?= --hipsycl-targets="omp;cuda:sm_60;hip:gfx906" --hipsycl-explicit-multipass --hipsycl-cuda-path=/usr/local/cuda
+SYCLCC     ?= /opt/hipSYCL/bin/syclcc
+SYCL_FLAGS ?= --hipsycl-targets="omp;cuda:sm_60;hip:gfx906" --hipsycl-explicit-multipass --hipsycl-cuda-path=/usr/local/cuda
 
 # hipSYCL syclcc + intel/llvm fork, missing '-fsycl-unnamed-lambda' flag, "highly experimental".
 #SYCLCC     ?= /opt/hipSYCL/bin/syclcc
@@ -39,6 +39,10 @@ GPU_ARCH   ?= sm_30
 # intel/llvm
 #SYCLCC     ?= /opt/intel-llvm/bin/clang -fsycl
 #SYCL_FLAGS ?= -lstdc++
+
+# xilinx/llvm, compiler crashes in my environment...
+#SYCLCC     ?= /opt/xilinx-llvm/bin/clang -fsycl
+#SYCL_FLAGS ?= -lstdc++ -fsycl-targets=fpga64_hw_emu
 
 LIB_ARCH   = lib64
 
