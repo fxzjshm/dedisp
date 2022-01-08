@@ -1,0 +1,3 @@
+[submodule "3rdparty/SyclParallelSTL"]
+	path = 3rdparty/SyclParallelSTL
+	url = https://github.com/fxzjshm/SyclParallelSTL

@@ -13,7 +13,7 @@ OPTIMISE  := -O3
 # Note: Using -G makes the GPU kernel 16x slower!
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
-INCLUDE   := -I$(SRC_DIR)
+INCLUDE   := -I$(SRC_DIR) -I$(SRC_DIR)/../3rdparty/SyclParallelSTL/include
 # LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
 LIB       := -lstdc++
 
