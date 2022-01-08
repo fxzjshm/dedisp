@@ -464,8 +464,8 @@ dedisp_error scrunch_x2(const dedisp_word* d_in,
         dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 
-    auto execution_policy = ::sycl_pstl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
-    sycl_pstl::impl::transform(execution_policy,
+    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+    ::sycl::impl::transform(execution_policy,
                    boost::make_counting_iterator<unsigned int>(0),
                    boost::make_counting_iterator<unsigned int>(out_count),
                    d_out_begin,
@@ -596,8 +596,8 @@ dedisp_error unpack(const dedisp_word* d_transposed,
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 	
-    auto execution_policy = ::sycl_pstl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
-    sycl_pstl::impl::transform(execution_policy,
+    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+    ::sycl::impl::transform(execution_policy,
                        boost::make_counting_iterator<unsigned int>(0),
                        boost::make_counting_iterator<unsigned int>(out_count),
                        d_unpacked_begin,

@@ -87,7 +87,7 @@ public:
       : _alloc(get_default_queue()), _size(n) {
     _capacity = 2 * _size;
     _storage = _alloc.allocate(_capacity);
-    std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
+    std::fill(::sycl::sycl_execution_policy(get_default_queue()),
               begin(), end(), T(value));
   }
   device_vector(const device_vector &other) : _alloc(get_default_queue()) {
@@ -241,7 +241,7 @@ public:
   }
   void assign(size_type n, const T &x) {
     resize(n);
-    std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
+    std::fill(::sycl::sycl_execution_policy(get_default_queue()),
               begin(), begin() + n, x);
   }
   template <typename InputIterator>
@@ -288,7 +288,7 @@ public:
   void insert(iterator position, size_type n, const T &x) {
     if (position == end()) {
       resize(size() + n);
-      std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
+      std::fill(::sycl::sycl_execution_policy(get_default_queue()),
                 end() - n, end(), x);
     } else {
       auto i_n = std::distance(begin(), position);
@@ -303,7 +303,7 @@ public:
       // resizing might invalidate position
       position = begin() + position.get_idx();
 
-      std::fill(::sycl_pstl::sycl_execution_policy(get_default_queue()),
+      std::fill(::sycl::sycl_execution_policy(get_default_queue()),
                 position, position + n, x);
 
       dpct::copy(

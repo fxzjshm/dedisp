@@ -862,8 +862,8 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 					// Note: This has the effect of increasing dt in the delay eqn
 					dedisp_size dm_offset = first_dm_idx + scrunch_start;
                     
-                    auto execution_policy = ::sycl_pstl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
-                    sycl_pstl::impl::transform(
+                    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
+                    ::sycl::impl::transform(
                         execution_policy,
                         plan->d_dm_list.begin() + dm_offset,
                         plan->d_dm_list.begin() + dm_offset + scrunch_count,
