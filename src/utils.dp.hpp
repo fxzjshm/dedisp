@@ -28,6 +28,8 @@
 
 typedef cl_uint gpu_size_t;
 
+extern boost::compute::program_cache dedisp_program_cache;
+
 namespace dedisp {
 
 template<typename T>

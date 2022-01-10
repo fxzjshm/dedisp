@@ -159,22 +159,16 @@ void Transpose<T>::transpose(bc::buffer& in,
 			//       detrimental to performance. Could work out a heuristic.
 			//bool round_grid_to_pow2 = false;
 			bool round_grid_to_pow2 = true;
+            bc::context context = bc::system::default_context();
 			
             auto call_transpose_kernel = [&](bool GRID_IS_POW2, bc::extents<3> grid, bc::extents<3> block) {
-                bc::program program = bc::program::create_with_source(transpose_kernel_src, bc::system::default_context());
                 std::string build_arguments;
                 build_arguments += std::string("-DT_TYPE=") + dedisp::get_cl_typename<T>() + " ";
                 build_arguments += std::string("-DTILE_DIM=") + std::to_string(TILE_DIM) + " ";
                 build_arguments += std::string("-DBLOCK_ROWS=") + std::to_string(BLOCK_ROWS) + " ";
                 build_arguments += std::string("-DGRID_IS_POW2=") + std::to_string(int(GRID_IS_POW2)) + " ";
-                try {
-                    program.build(build_arguments.c_str());
-                } catch(...) {
-                    std::cerr << "Build OpenCL source fail at" << __FILE__ << ":" << __LINE__ << std::endl;
-                    std::cerr << "Build log is: " << std::endl
-                              << program.build_log() << std::endl;
-                }
-                bc::kernel kernel = program.create_kernel("transpose_kernel");
+                bc::kernel kernel = dedisp_program_cache.get_or_build(/* key = */ "dedisp_transpose_kernel", build_arguments, transpose_kernel_src, context).create_kernel("transpose_kernel");
+                
                 /*
                  * transpose_kernel(__global const T* in, gpu_size_t in_offset,
                  *                  gpu_size_t width, gpu_size_t height,

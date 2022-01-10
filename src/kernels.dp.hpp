@@ -40,8 +40,7 @@ namespace bc = boost::compute;
 bc::buffer c_delay_table;
 bc::buffer c_killmask;
 
-typedef bc::detail::lru_cache<std::string, bc::kernel> kernel_cache_type;
-BOOST_COMPUTE_DETAIL_GLOBAL_STATIC(kernel_cache_type, kernel_cache, (16));
+boost::compute::program_cache dedisp_program_cache(64);
 
 template<int NBITS, typename T=unsigned int>
 struct max_value {
@@ -154,31 +153,16 @@ bool dedisperse(bc::buffer       d_in,
     // Execute the kernel
     auto DEDISP_CALL_KERNEL = [&](int NBITS) {
         cl_int error;
-        std::string key = "dedisperse_kernel" + std::to_string(NBITS);
-        boost::optional<bc::kernel> m_kernel = kernel_cache.get(key);
-        bc::kernel kernel;
-        if(m_kernel) {
-            kernel = *m_kernel;
-        } else {
-            bc::program program = bc::program::create_with_source(dedisperse_kernel_src, bc::system::default_context());
-            std::string build_arguments = dedisp::type_define_arguments;
-            // macros need to be defined when compile:
-            //     DEDISP_WORD_TYPE, DEDISP_SIZE_TYPE, DEDISP_FLOAT_TYPE, DEDISP_BYTE_TYPE, DEDISP_BOOL_TYPE
-            //     int IN_NBITS, int SAMPS_PER_THREAD, int BLOCK_DIM_X, int BLOCK_DIM_Y
-            build_arguments += std::string("-DIN_NBITS=") + std::to_string(NBITS) + " ";
-            build_arguments += std::string("-DSAMPS_PER_THREAD=") + std::to_string(DEDISP_SAMPS_PER_THREAD) + " ";
-            build_arguments += std::string("-DBLOCK_DIM_X=") + std::to_string(BLOCK_DIM_X) + " ";
-            build_arguments += std::string("-DBLOCK_DIM_Y=") + std::to_string(BLOCK_DIM_Y) + " ";
-            try {
-                program.build(build_arguments.c_str());
-            } catch(bc::opencl_error error) {
-                std::cerr << "Build OpenCL source fail at " << __FILE__ << ":" << __LINE__ << std::endl;
-                std::cerr << "Build log is: " << std::endl
-                          << program.build_log() << std::endl;
-            }
-            kernel = program.create_kernel("dedisperse_kernel");
-            kernel_cache.insert(key, kernel);
-        }
+        const std::string key = "dedisperse_kernel" + std::to_string(NBITS);
+        std::string build_arguments = dedisp::type_define_arguments;
+        // macros need to be defined when compile:
+        //     DEDISP_WORD_TYPE, DEDISP_SIZE_TYPE, DEDISP_FLOAT_TYPE, DEDISP_BYTE_TYPE, DEDISP_BOOL_TYPE
+        //     int IN_NBITS, int SAMPS_PER_THREAD, int BLOCK_DIM_X, int BLOCK_DIM_Y
+        build_arguments += std::string("-DIN_NBITS=") + std::to_string(NBITS) + " ";
+        build_arguments += std::string("-DSAMPS_PER_THREAD=") + std::to_string(DEDISP_SAMPS_PER_THREAD) + " ";
+        build_arguments += std::string("-DBLOCK_DIM_X=") + std::to_string(BLOCK_DIM_X) + " ";
+        build_arguments += std::string("-DBLOCK_DIM_Y=") + std::to_string(BLOCK_DIM_Y) + " ";
+        bc::kernel kernel = dedisp_program_cache.get_or_build(key, build_arguments, dedisperse_kernel_src, context).create_kernel("dedisperse_kernel");
 
         /*
 __kernel void dedisperse_kernel(
@@ -263,10 +247,8 @@ dedisp_error scrunch_x2(bc::buffer  d_in, dedisp_size d_in_offset,
     dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 
-    bc::program program = bc::program::create_with_source(scrunch_x2_src, bc::system::default_context());
     std::string build_arguments = dedisp::type_define_arguments;
-    program.build(build_arguments.c_str());
-    bc::kernel kernel = program.create_kernel("scrunch_x2_kernel");
+    bc::kernel kernel = dedisp_program_cache.get_or_build(/* key = */ "dedisp_scrunch_x2_kernel", build_arguments, scrunch_x2_src, bc::system::default_context()).create_kernel("scrunch_x2_kernel");
     /* __kernel void scrunch_x2_kernel(__global WordType* in, dedisp_size in_offset __global dedisp_word* outs, dedisp_size out_offset, int nbits, unsigned int in_nsamps); */
     kernel.set_arg(0, d_in);
     kernel.set_arg(1, d_in_offset);
@@ -345,10 +327,8 @@ dedisp_error unpack(bc::buffer d_transposed,
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 
-    bc::program program = bc::program::create_with_source(unpack_kernel_src, bc::system::default_context());
     std::string build_arguments = dedisp::type_define_arguments;
-    program.build(build_arguments.c_str());
-    bc::kernel kernel = program.create_kernel("unpack_kernel");
+    bc::kernel kernel = dedisp_program_cache.get_or_build(/* key = */ "dedisp_unpack_kernel", build_arguments, unpack_kernel_src, bc::system::default_context()).create_kernel("unpack_kernel");
     /* __kernel void unpack_kernel(__global WordType* in, __global dedisp_word* out, int nsamps, int in_nbits, int out_nbits); */
     kernel.set_arg(0, d_transposed);
     kernel.set_arg(1, d_unpacked);
