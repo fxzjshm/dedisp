@@ -9,7 +9,7 @@ INCLUDE_DIR = include
 
 SRC_DIR   := src
 #INC_DIR   := ./include
-OPTIMISE  := -O3
+OPTIMISE  := -O3 -DBOOST_COMPUTE_USE_OFFLINE_CACHE
 # Note: Using -G makes the GPU kernel 16x slower!
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
