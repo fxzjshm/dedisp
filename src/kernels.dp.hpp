@@ -127,9 +127,9 @@ T scale_output(SumType sum, dedisp_size nchans) {
 	float factor = (3.f * 1024.f) / 255.f / 16.f;
 	float scaled = (float)sum * out_range / (in_range * nchans) * factor;
 	// Clip to range when necessary
-        scaled = (sizeof(T) == 4) ? scaled
-                                  : sycl::min(sycl::max(scaled, 0.f), out_range);
-        return (T)scaled;
+	scaled = (sizeof(T)==4) ? scaled
+	                        : sycl::min(sycl::max(scaled, 0.f), out_range);
+	return (T)scaled;
 }
 
 template<int NBITS, typename T>
@@ -187,13 +187,13 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 	};
 	
 	// Compute the thread decomposition
-        dedisp_size samp_block = item_ct1.get_group(0);
-        dedisp_size dm_block = item_ct1.get_group(1) % ndm_blocks;
-        dedisp_size batch_block = item_ct1.get_group(1) / ndm_blocks;
-
-        dedisp_size samp_idx = samp_block * BLOCK_DIM_X + item_ct1.get_local_id(0);
-        dedisp_size dm_idx = dm_block * BLOCK_DIM_Y + item_ct1.get_local_id(1);
-        dedisp_size batch_idx     = batch_block;
+	dedisp_size samp_block    = item_ct1.get_group(0);
+	dedisp_size dm_block      = item_ct1.get_group(1) % ndm_blocks;
+	dedisp_size batch_block   = item_ct1.get_group(1) / ndm_blocks;
+	
+	dedisp_size samp_idx      = samp_block   * BLOCK_DIM_X + item_ct1.get_local_id(0);
+	dedisp_size dm_idx        = dm_block     * BLOCK_DIM_Y + item_ct1.get_local_id(1);
+	dedisp_size batch_idx     = batch_block;
 	dedisp_size nsamp_threads = nsamp_blocks * BLOCK_DIM_X;
 	
 	dedisp_size ndm_threads   = ndm_blocks * BLOCK_DIM_Y;
@@ -233,21 +233,17 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 				// Look up the fractional delay
 				dedisp_float frac_delay = c_delay_table[chan_idx];
 				// Compute the integer delay
-                                dedisp_size delay =
-                                    sycl::vec<float, 1>{dm * frac_delay}
-                                        .convert<unsigned int,
-                                                 sycl::rounding_mode::rte>()[0];
-
-//
-//                if( USE_TEXTURE_MEM ) { // Pre-Fermi path
+				dedisp_size delay = sycl::vec<float, 1>{dm * frac_delay}.convert<unsigned int, sycl::rounding_mode::rte>()[0];
+				
+//				if( USE_TEXTURE_MEM ) { // Pre-Fermi path
 //					// Loop over samples per thread
 //					// Note: Unrolled to ensure the sum[] array is stored in regs
 //                    #pragma unroll
 //					for( dedisp_size s=0; s<SAMPS_PER_THREAD; ++s ) {
 //						// Grab the word containing the sample from texture mem
-//                                                dedisp_word sample = t_in.read(offset + s + delay);
-//
-//                                                // Extract the desired subword and accumulate
+//						dedisp_word sample = t_in.read(offset+s + delay);
+//						
+//						// Extract the desired subword and accumulate
 //						sum[s] +=
 //							// TODO: Pre-Fermi cards are faster with 24-bit mul
 //							/*__umul24*/(c_killmask[chan_idx] *//,
@@ -342,48 +338,38 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
 	
 	// Define thread decomposition
 	// Note: Block dimensions x and y represent time samples and DMs respectively
-        sycl::range<3> block(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
-        // Note: Grid dimension x represents time samples. Dimension y represents
+	sycl::range<3> block(BLOCK_DIM_X, BLOCK_DIM_Y, 1);
+	// Note: Grid dimension x represents time samples. Dimension y represents
 	//         DMs and batch jobs flattened together.
 	
 	// Divide and round up
-        dedisp_size nsamp_blocks =
-            (nsamps - 1) / ((dedisp_size)DEDISP_SAMPS_PER_THREAD * block[0]) + 1;
-        dedisp_size ndm_blocks = (dm_count - 1) / (dedisp_size)block[1] + 1;
-
-        // Constrain the grid size to the maximum allowed
+	dedisp_size nsamp_blocks = (nsamps - 1)   
+		/ ((dedisp_size)DEDISP_SAMPS_PER_THREAD*block[0]) + 1;
+	dedisp_size ndm_blocks   = (dm_count - 1) / (dedisp_size)block[1] + 1;
+	
+	// Constrain the grid size to the maximum allowed
 	// TODO: Consider cropping the batch size dimension instead and looping over it
 	//         inside the kernel
-        ndm_blocks =
-            std::min((unsigned int)ndm_blocks,
-                     (unsigned int)(MAX_CUDA_GRID_SIZE_Y / batch_size));
-
-        // Note: We combine the DM and batch dimensions into one
-        sycl::range<3> grid(nsamp_blocks, ndm_blocks * batch_size, 1);
-
-        // Divide and round up
+	ndm_blocks = std::min((unsigned int)ndm_blocks, (unsigned int)(MAX_CUDA_GRID_SIZE_Y/batch_size));
+	
+	// Note: We combine the DM and batch dimensions into one
+	sycl::range<3> grid(nsamp_blocks, ndm_blocks * batch_size, 1);
+	
+	// Divide and round up
 	dedisp_size nsamps_reduced = (nsamps - 1) / DEDISP_SAMPS_PER_THREAD + 1;
-
-        sycl::queue *stream = &dpct::dev_mgr::instance().current_device().default_queue();
-		
-        // Execute the kernel
-/*
-DPCT1049:13: The workgroup size passed to the SYCL kernel may exceed the limit.
-To get the device limit, query info::device::max_work_group_size. Adjust the
-workgroup size if needed.
-*/
-#define DEDISP_CALL_KERNEL(NBITS, USE_TEXTURE_MEM)                             \
-        stream->submit(\
+	
+	sycl::queue *stream = &dpct::dev_mgr::instance().current_device().default_queue();
+	
+	// Execute the kernel
+#define DEDISP_CALL_KERNEL(NBITS, USE_TEXTURE_MEM)						\
+	stream->submit(\
   [&](sycl::handler &cgh) {\
-    /* init global memory */\
     c_delay_table.init(*stream);\
     c_killmask.init(*stream);\
 \
-    /* pointers to device memory */\
     auto c_delay_table_ptr_ct1 = c_delay_table.get_ptr();\
     auto c_killmask_ptr_ct1 = c_killmask.get_ptr();\
 \
-    /* helper variables defined*/\
     auto d_in_ct0 = d_in;\
     auto nsamps_ct1 = nsamps;\
     auto nsamps_reduced_ct2 = nsamps_reduced;\
@@ -406,35 +392,26 @@ workgroup size if needed.
     cgh.parallel_for(\
       sycl::nd_range<3>(grid * block, block), \
       [=](sycl::nd_item<3> item_ct1) {\
-        dedisperse_kernel<NBITS, DEDISP_SAMPS_PER_THREAD, BLOCK_DIM_X, BLOCK_DIM_Y> \
-		(d_in_ct0, nsamps_ct1, nsamps_reduced_ct2, nsamp_blocks_ct3, in_stride_ct4, \
-		dm_count_ct5, dm_stride_ct6, ndm_blocks_ct7, nchans_ct8, chan_stride_ct9, \
-		d_out_ct10, out_nbits_ct11, out_stride_ct12, d_dm_list_ct13, batch_in_stride_ct14, \
-		batch_dm_stride_ct15, batch_chan_stride_ct16, batch_out_stride_ct17, item_ct1, \
-		c_delay_table_ptr_ct1, c_killmask_ptr_ct1);\
+        dedisperse_kernel<NBITS, DEDISP_SAMPS_PER_THREAD, BLOCK_DIM_X, BLOCK_DIM_Y>(d_in_ct0, nsamps_ct1, nsamps_reduced_ct2, nsamp_blocks_ct3, in_stride_ct4, dm_count_ct5, dm_stride_ct6, ndm_blocks_ct7, nchans_ct8, chan_stride_ct9, d_out_ct10, out_nbits_ct11, out_stride_ct12, d_dm_list_ct13, batch_in_stride_ct14, batch_dm_stride_ct15, batch_chan_stride_ct16, batch_out_stride_ct17, item_ct1, c_delay_table_ptr_ct1, c_killmask_ptr_ct1);\
       });\
   });
 	// Note: Here we dispatch dynamically on nbits for supported values
 		switch( in_nbits ) {
-			case 1:  DEDISP_CALL_KERNEL(1,false);  break;
-			case 2:  DEDISP_CALL_KERNEL(2,false);  break;
-			case 4:  DEDISP_CALL_KERNEL(4,false);  break;
-			case 8:  DEDISP_CALL_KERNEL(8,false);  break;
-			case 16: DEDISP_CALL_KERNEL(16,false); break;
-			case 32: DEDISP_CALL_KERNEL(32,false); break;
-            default: /* should never be reached */ break;
+			case 1:  DEDISP_CALL_KERNEL(1,false)  break;
+			case 2:  DEDISP_CALL_KERNEL(2,false)  break;
+			case 4:  DEDISP_CALL_KERNEL(4,false)  break;
+			case 8:  DEDISP_CALL_KERNEL(8,false)  break;
+			case 16: DEDISP_CALL_KERNEL(16,false) break;
+			case 32: DEDISP_CALL_KERNEL(32,false) break;
+			default: /* should never be reached */ break;
 		}
-	
+
 #undef DEDISP_CALL_KERNEL
 		
 	// Check for kernel errors
 #ifdef DEDISP_DEBUG
 	//cudaStreamSynchronize(stream);
-	cudaThreadSynchronize();
-	cudaError_t cuda_error = cudaGetLastError();
-	if( cuda_error != cudaSuccess ) {
-		return false;
-	}
+	stream->wait();
 #endif // DEDISP_DEBUG
 	
 	return true;
@@ -442,14 +419,8 @@ workgroup size if needed.
 
 
 template<typename WordType>
-struct scrunch_x2_functor
-        /*
-DPCT1044:14: thrust::unary_function was removed because std::unary_function has
-been deprecated in C++11. You may need to remove references to typedefs from
-thrust::unary_function in the class definition.
-*/
-        {
-        const WordType* in;
+struct scrunch_x2_functor {
+	const WordType* in;
 	int             nbits;
 	WordType        mask;
 	unsigned int    in_nsamps;
@@ -486,21 +457,18 @@ dedisp_error scrunch_x2(const dedisp_word* d_in,
                         dedisp_size nbits,
                         dedisp_word* d_out)
 {
-        dpct::device_pointer<dedisp_word> d_out_begin(d_out);
-
-        dedisp_size out_nsamps = nsamps / 2;
+	dpct::device_pointer<dedisp_word> d_out_begin(d_out);
+	
+	dedisp_size out_nsamps = nsamps / 2;
 	dedisp_size out_count  = out_nsamps * nchan_words;
 	
+	std::transform(oneapi::dpl::execution::make_device_policy(dpct::get_default_queue()),
+                      dpct::make_counting_iterator<unsigned int>(0),
+	                  dpct::make_counting_iterator<unsigned int>(out_count),
+	                  d_out_begin,
+	                  scrunch_x2_functor<dedisp_word>(d_in, nbits, nsamps));
 	
-
-        std::transform(oneapi::dpl::execution::make_device_policy(
-                           dpct::dev_mgr::instance().current_device().default_queue()),
-                       dpct::make_counting_iterator<unsigned int>(0),
-                       dpct::make_counting_iterator<unsigned int>(out_count),
-                       d_out_begin,
-                       scrunch_x2_functor<dedisp_word>(d_in, nbits, nsamps));
-
-        return DEDISP_NO_ERROR;
+	return DEDISP_NO_ERROR;
 }
 
 dedisp_float get_smearing(dedisp_float dt, dedisp_float pulse_width,
@@ -555,14 +523,8 @@ dedisp_error generate_scrunch_list(dedisp_size* scrunch_list,
 }
 
 template<typename WordType>
-struct unpack_functor
-        /*
-DPCT1044:15: thrust::unary_function was removed because std::unary_function has
-been deprecated in C++11. You may need to remove references to typedefs from
-thrust::unary_function in the class definition.
-*/
-        {
-        const WordType* in;
+struct unpack_functor {
+	const WordType* in;
 	int             nsamps;
 	int             in_nbits;
 	int             out_nbits;
@@ -619,21 +581,18 @@ dedisp_error unpack(const dedisp_word* d_transposed,
                     dedisp_word* d_unpacked,
                     dedisp_size in_nbits, dedisp_size out_nbits)
 {
-        dpct::device_pointer<dedisp_word> d_unpacked_begin(d_unpacked);
-
-        dedisp_size expansion = out_nbits / in_nbits;
+	dpct::device_pointer<dedisp_word> d_unpacked_begin(d_unpacked);
+	
+	dedisp_size expansion = out_nbits / in_nbits;
 	dedisp_size in_count  = nsamps * nchan_words;
 	dedisp_size out_count = in_count * expansion;
 	
+	std::transform(oneapi::dpl::execution::make_device_policy(dpct::get_default_queue()),
+                      dpct::make_counting_iterator<unsigned int>(0),
+	                  dpct::make_counting_iterator<unsigned int>(out_count),
+	                  d_unpacked_begin,
+	                  unpack_functor<dedisp_word>(d_transposed, nsamps,
+	                                              in_nbits, out_nbits));
 	
-
-        std::transform(oneapi::dpl::execution::make_device_policy(
-                           dpct::dev_mgr::instance().current_device().default_queue()),
-                       dpct::make_counting_iterator<unsigned int>(0),
-                       dpct::make_counting_iterator<unsigned int>(out_count),
-                       d_unpacked_begin,
-                       unpack_functor<dedisp_word>(d_transposed, nsamps,
-                                                   in_nbits, out_nbits));
-
-        return DEDISP_NO_ERROR;
+	return DEDISP_NO_ERROR;
 }
