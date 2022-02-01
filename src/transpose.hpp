@@ -314,12 +314,6 @@ void Transpose<T>::transpose(const T* in,
 			
 #ifndef NDEBUG
             stream->wait();
-            /*
-            DPCT1010:6: SYCL uses exceptions to report errors and
-            does not use the error codes. The call was replaced with
-            0. You need to rewrite this code.
-            */
-            int error = 0;
 #endif
 		}
 	}

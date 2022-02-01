@@ -195,13 +195,13 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 	};
 	
 	// Compute the thread decomposition
-        dedisp_size samp_block = item_ct1.get_group(0);
-        dedisp_size dm_block = item_ct1.get_group(1) % ndm_blocks;
-        dedisp_size batch_block = item_ct1.get_group(1) / ndm_blocks;
+    dedisp_size samp_block = item_ct1.get_group(0);
+    dedisp_size dm_block = item_ct1.get_group(1) % ndm_blocks;
+    dedisp_size batch_block = item_ct1.get_group(1) / ndm_blocks;
 
-        dedisp_size samp_idx = samp_block * BLOCK_DIM_X + item_ct1.get_local_id(0);
-        dedisp_size dm_idx = dm_block * BLOCK_DIM_Y + item_ct1.get_local_id(1);
-        dedisp_size batch_idx     = batch_block;
+    dedisp_size samp_idx = samp_block * BLOCK_DIM_X + item_ct1.get_local_id(0);
+    dedisp_size dm_idx = dm_block * BLOCK_DIM_Y + item_ct1.get_local_id(1);
+    dedisp_size batch_idx     = batch_block;
 	dedisp_size nsamp_threads = nsamp_blocks * BLOCK_DIM_X;
 	
 	dedisp_size ndm_threads   = ndm_blocks * BLOCK_DIM_Y;
@@ -415,14 +415,8 @@ bool dedisperse(/*const*/ dedisp_word*  d_in,
 
 
 template<typename WordType>
-struct scrunch_x2_functor
-        /*
-DPCT1044:14: thrust::unary_function was removed because std::unary_function has
-been deprecated in C++11. You may need to remove references to typedefs from
-thrust::unary_function in the class definition.
-*/
-        {
-        const WordType* in;
+struct scrunch_x2_functor {
+    const WordType* in;
 	int             nbits;
 	WordType        mask;
 	unsigned int    in_nsamps;
@@ -526,14 +520,8 @@ dedisp_error generate_scrunch_list(dedisp_size* scrunch_list,
 }
 
 template<typename WordType>
-struct unpack_functor
-        /*
-DPCT1044:15: thrust::unary_function was removed because std::unary_function has
-been deprecated in C++11. You may need to remove references to typedefs from
-thrust::unary_function in the class definition.
-*/
-        {
-        const WordType* in;
+struct unpack_functor {
+    const WordType* in;
 	int             nsamps;
 	int             in_nbits;
 	int             out_nbits;

@@ -31,6 +31,7 @@
 #else
 #include <CL/sycl.hpp>
 #endif
+
 // For copying and scrunching the DM list
 #include <sycl/execution_policy>
 #include <sycl/algorithm/fill.hpp>
@@ -55,7 +56,7 @@
 #include <iostream>
 using std::cout;
 using std::endl;
-#include "stopwatch.hpp"
+#include "stopwatch.h"
 #endif
 // -----------------------------------------
 
@@ -136,14 +137,6 @@ dedisp_error throw_error(dedisp_error error) {
 */
 
 dedisp_error update_scrunch_list(dedisp_plan plan) {
-        /*
-        DPCT1010:16: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
 	if( !plan->scrunching_enabled || 0 == plan->dm_count ) {
 		plan->scrunch_list.resize(0);
 		// Fill with 1's by default for safety
@@ -192,15 +185,6 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
 {
 	// Initialise to NULL for safety
 	*plan_ = 0;
-
-        /*
-        DPCT1010:17: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
 	
 	int device_idx = dpct::dev_mgr::instance().current_device_id();
 
@@ -285,14 +269,6 @@ dedisp_error dedisp_set_dm_list(dedisp_plan plan,
 	if( !dm_list ) {
 		throw_error(DEDISP_INVALID_POINTER);
 	}
-        /*
-        DPCT1010:18: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
 	
 	plan->dm_count = count;
 	plan->dm_list.assign(dm_list, dm_list+count);
@@ -324,14 +300,6 @@ dedisp_error dedisp_generate_dm_list(dedisp_plan plan,
                                      dedisp_float ti, dedisp_float tol)
 {
 	if( !plan ) { throw_error(DEDISP_INVALID_PLAN); }
-        /*
-        DPCT1010:19: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
 	
 	// Generate the DM list (on the host)
 	plan->dm_list.clear();
@@ -393,14 +361,7 @@ dedisp_error dedisp_set_device(int device_idx) {
 dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 {
 	if( !plan ) { throw_error(DEDISP_INVALID_PLAN); }
-        /*
-        DPCT1010:22: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        if (0 != 0) {
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	}
+
 	if( 0 != killmask ) {
 		// Copy killmask to plan (both host and device)
 		plan->killmask.assign(killmask, killmask + plan->nchans);
@@ -715,7 +676,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 			}
 		}
 #ifdef DEDISP_BENCHMARK
-		cudaThreadSynchronize();
+		dpct::get_default_queue().wait();
 		copy_to_timer.stop();
 		transpose_timer.start();
 #endif
@@ -726,7 +687,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		                    in_buf_stride_words, nsamps_padded_gulp,
 		                    d_transposed);
 #ifdef DEDISP_BENCHMARK
-		cudaThreadSynchronize();
+		dpct::get_default_queue().wait();
 		transpose_timer.stop();
 		
 		kernel_timer.start();
@@ -907,7 +868,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif // SB/direct algorithm
 
 #ifdef DEDISP_BENCHMARK
-		cudaThreadSynchronize();
+		dpct::get_default_queue().wait();
 		kernel_timer.stop();
 #endif
 		// Copy output back to host memory if necessary
@@ -951,7 +912,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 				                       dm_count);                 // height
 			}
 #ifdef DEDISP_BENCHMARK
-			cudaThreadSynchronize();
+			dpct::get_default_queue().wait();
 			copy_from_timer.stop();
 #endif
 		}
@@ -1033,20 +994,12 @@ dedisp_error dedisp_execute(const dedisp_plan  plan,
 
 dedisp_error dedisp_sync(void) {
 	try {
-        /*
-        DPCT1003:28: Migrated API does not return error code. (*, 0) is
-        inserted. You may need to rewrite this code.
-        */
-        if ((dpct::get_current_device().queues_wait_and_throw(), 0) != 0)
-                throw_error(DEDISP_PRIOR_GPU_ERROR);
-	else
+        dpct::get_current_device().queues_wait_and_throw();
 		return DEDISP_NO_ERROR;
-}
-catch (sycl::exception const &exc) {
-  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-            << ", line:" << __LINE__ << std::endl;
-  std::exit(1);
-}
+    }
+    catch (sycl::exception const &exc) {
+        throw_error(DEDISP_PRIOR_GPU_ERROR);
+    }
 }
 
 void dedisp_destroy_plan(dedisp_plan plan)

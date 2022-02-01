@@ -50,40 +50,26 @@ void free_device(T*& addr) {
 template <typename T>
 bool copy_host_to_device(T *dst, const T *src, gpu_size_t count,
                          sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
+    // TODO: Can't use Async versions unless host memory is pinned!
 	// TODO: Passing a device pointer as src causes this to segfault
-        dpct::get_default_queue()
-            .memcpy /*Async*/ (dst, src, count * sizeof(T) /*, stream*/)
-            .wait();
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:1: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+    dpct::get_default_queue()
+        .memcpy /*Async*/ (dst, src, count * sizeof(T) /*, stream*/)
+        .wait();
+    //#ifdef DEDISP_DEBUG
+    dpct::get_current_device().queues_wait_and_throw();
+    //#endif
 	return true;
 }
 template <typename T>
 bool copy_device_to_host(T *dst, const T *src, gpu_size_t count,
                          sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-        dpct::get_default_queue()
-            .memcpy /*Async*/ (dst, src, count * sizeof(T) /*, stream*/)
-            .wait();
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:2: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+    // TODO: Can't use Async versions unless host memory is pinned!
+    dpct::get_default_queue()
+        .memcpy /*Async*/ (dst, src, count * sizeof(T) /*, stream*/)
+        .wait();
+    //#ifdef DEDISP_DEBUG
+    dpct::get_current_device().queues_wait_and_throw();
+    //#endif
 	return true;
 }
 #if 0
@@ -128,21 +114,14 @@ template <typename T, typename U>
 bool copy_host_to_device_2d(T *dst, gpu_size_t dst_stride, const U *src,
                             gpu_size_t src_stride, gpu_size_t width_bytes,
                             gpu_size_t height, sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-        dpct::dpct_memcpy /*Async*/ (dst, dst_stride, //*sizeof(T),
-                                     src, src_stride, //*sizeof(U),
-                                     width_bytes, height,
-                                     dpct::host_to_device /*, stream*/);
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:3: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+    // TODO: Can't use Async versions unless host memory is pinned!
+    dpct::dpct_memcpy /*Async*/ (dst, dst_stride, //*sizeof(T),
+                                 src, src_stride, //*sizeof(U),
+                                 width_bytes, height,
+                                 dpct::host_to_device /*, stream*/);
+    //#ifdef DEDISP_DEBUG
+    dpct::get_current_device().queues_wait_and_throw();
+    //#endif
 	return true;
 }
 
@@ -150,20 +129,13 @@ template <typename T, typename U>
 bool copy_device_to_host_2d(T *dst, gpu_size_t dst_stride, const U *src,
                             gpu_size_t src_stride, gpu_size_t width_bytes,
                             gpu_size_t height, sycl::queue *stream = 0) {
-        // TODO: Can't use Async versions unless host memory is pinned!
-        dpct::dpct_memcpy /*Async*/ (dst, dst_stride, src, src_stride,
-                                     width_bytes, height,
-                                     dpct::device_to_host /*, stream*/);
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:4: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+    // TODO: Can't use Async versions unless host memory is pinned!
+    dpct::dpct_memcpy /*Async*/ (dst, dst_stride, src, src_stride,
+                                 width_bytes, height,
+                                 dpct::device_to_host /*, stream*/);
+    //#ifdef DEDISP_DEBUG
+    dpct::get_current_device().queues_wait_and_throw();
+    //#endif
 	return true;
 }
 
@@ -171,18 +143,11 @@ template <typename T, typename U>
 bool copy_device_to_device_2d(T *dst, gpu_size_t dst_stride, const U *src,
                               gpu_size_t src_stride, gpu_size_t width_bytes,
                               gpu_size_t height, sycl::queue *stream = 0) {
-        dpct::dpct_memcpy /*Async*/ (dst, dst_stride, src, src_stride,
-                                     width_bytes, height,
-                                     dpct::device_to_device /*, stream*/);
-        //#ifdef DEDISP_DEBUG
-        dpct::get_current_device().queues_wait_and_throw();
-        /*
-        DPCT1010:5: SYCL uses exceptions to report errors and does not use the
-        error codes. The call was replaced with 0. You need to rewrite this
-        code.
-        */
-        int error = 0;
-
-        //#endif
+    dpct::dpct_memcpy /*Async*/ (dst, dst_stride, src, src_stride,
+                                 width_bytes, height,
+                                 dpct::device_to_device /*, stream*/);
+    //#ifdef DEDISP_DEBUG
+    dpct::get_current_device().queues_wait_and_throw();
+    //#endif
 	return true;
 }
