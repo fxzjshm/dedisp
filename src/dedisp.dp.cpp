@@ -536,20 +536,16 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	}
 	
 	// Copy the lookup tables to constant memory on the device
-    /*
-    dpct::dev_mgr::instance().current_device().default_queue().memcpy(
+    dpct::get_default_queue().memcpy(
          c_delay_table,
          dpct::get_raw_pointer(&plan->d_delay_table[0]),
          plan->nchans * sizeof(dedisp_float));
     dpct::get_current_device().queues_wait_and_throw();
 
-    dpct::dev_mgr::instance().current_device().default_queue().memcpy(
+    dpct::get_default_queue().memcpy(
          c_killmask, dpct::get_raw_pointer(&plan->d_killmask[0]),
          plan->nchans * sizeof(dedisp_bool));
     dpct::get_current_device().queues_wait_and_throw();
-    */
-    c_delay_table = dpct::get_raw_pointer(&plan->d_delay_table[0]);
-    c_killmask = dpct::get_raw_pointer(&plan->d_killmask[0]);
 
     // Compute the problem decomposition
 	dedisp_size nsamps_computed = nsamps - plan->max_delay;

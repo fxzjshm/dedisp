@@ -40,10 +40,10 @@
 #define DEDISP_BLOCK_SAMPS      8
 #define DEDISP_SAMPS_PER_THREAD 2 // 4 is better for Fermi?
 
-// dedisp_float c_delay_table[DEDISP_MAX_NCHANS];
-// dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
-dedisp_float* c_delay_table;
-dedisp_bool*  c_killmask;
+dedisp_float c_delay_table[DEDISP_MAX_NCHANS];
+dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
+// dedisp_float* c_delay_table;
+// dedisp_bool*  c_killmask;
 
 template<int NBITS, typename T=unsigned int>
 struct max_value {
