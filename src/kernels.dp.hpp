@@ -40,10 +40,11 @@
 #define DEDISP_BLOCK_SAMPS      8
 #define DEDISP_SAMPS_PER_THREAD 2 // 4 is better for Fermi?
 
-dedisp_float c_delay_table[DEDISP_MAX_NCHANS];
-dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
-// dedisp_float* c_delay_table;
-// dedisp_bool*  c_killmask;
+// Use USM pointers as constant memory, remember to allocate when used
+// dedisp_float c_delay_table[DEDISP_MAX_NCHANS];
+// dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
+dedisp_float* c_delay_table;
+dedisp_bool*  c_killmask;
 
 template<int NBITS, typename T=unsigned int>
 struct max_value {
@@ -241,10 +242,7 @@ void dedisperse_kernel(const dedisp_word*  d_in,
 				// Look up the fractional delay
 				dedisp_float frac_delay = c_delay_table[chan_idx];
 				// Compute the integer delay
-                                dedisp_size delay =
-                                    sycl::vec<float, 1>{dm * frac_delay}
-                                        .convert<unsigned int,
-                                                 sycl::rounding_mode::rte>()[0];
+                dedisp_size delay = sycl::rint(dm * frac_delay);
 
 //
 //                if( USE_TEXTURE_MEM ) { // Pre-Fermi path

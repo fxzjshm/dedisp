@@ -496,6 +496,8 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		using_host_memory = !(flags & DEDISP_DEVICE_POINTERS);
 	}
 	
+    c_delay_table = sycl::malloc_device<dedisp_float>(DEDISP_MAX_NCHANS, dpct::get_default_queue());
+    c_killmask = sycl::malloc_device<dedisp_bool>(DEDISP_MAX_NCHANS, dpct::get_default_queue());
 	// Copy the lookup tables to constant memory on the device
     dpct::get_default_queue().memcpy(
          c_delay_table,
