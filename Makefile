@@ -22,7 +22,7 @@ HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.dp.hpp         \
              $(SRC_DIR)/gpu_memory.hpp $(SRC_DIR)/transpose.hpp
 INTERFACE := $(SRC_DIR)/dedisp.h
 CPP_INTERFACE := $(SRC_DIR)/DedispPlan.hpp
-CPP_FLAGS := -g ${SYCL_FLAGS}
+CPP_FLAGS := -g ${SYCL_FLAGS} -std=c++20
 
 LIB_NAME  := libdedisp
 SO_EXT    := .so

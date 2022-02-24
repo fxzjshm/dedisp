@@ -25,3 +25,14 @@
 #include "dpct/dpl_extras/iterators.h"
 
 #include <sycl/execution_policy>
+
+#include <boost/iterator/counting_iterator.hpp>
+#include <boost/iterator/permutation_iterator.hpp>
+
+#if defined(SYCL_DEVICE_COPYABLE) && SYCL_DEVICE_COPYABLE
+// patch for foreign iterators
+template <typename T>
+struct sycl::is_device_copyable<boost::iterators::counting_iterator<T>> : std::true_type {};
+template <class ElementIterator, class IndexIterator>
+struct sycl::is_device_copyable<boost::iterators::permutation_iterator<ElementIterator, IndexIterator>, std::enable_if_t<!std::is_trivially_copyable<boost::iterators::permutation_iterator<ElementIterator, IndexIterator>>::value>> : std::true_type {};
+#endif
