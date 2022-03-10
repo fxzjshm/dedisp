@@ -4,6 +4,8 @@ This implementation contains part of modified Intel's DPC++ compatibility tool (
 
 This implementation uses a forked version of SyclParallelSTL for compatibility with multiple SYCL implementations.
 
+Compiler setups can be found in Makefile.inc .
+
 ---
 
 # dedisp
