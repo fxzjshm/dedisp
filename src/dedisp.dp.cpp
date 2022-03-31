@@ -78,6 +78,9 @@ typedef unsigned int dedisp_word;
 // Note: This must be included after the above #define and typedef
 #include "kernels.dp.hpp"
 
+// Global variables
+::sycl::sycl_execution_policy<> execution_policy;
+
 // Define plan structure
 struct dedisp_plan_struct {
 	// Size parameters
@@ -95,10 +98,10 @@ struct dedisp_plan_struct {
 	std::vector<dedisp_bool>  killmask;     // size = nchans
 	std::vector<dedisp_size>  scrunch_list; // size = dm_count
 	// Device arrays
-    dpct::device_vector<dedisp_float> d_dm_list;
-    dpct::device_vector<dedisp_float> d_delay_table;
-    dpct::device_vector<dedisp_bool> d_killmask;
-    dpct::device_vector<dedisp_size> d_scrunch_list;
+    device_vector_wrapper<dedisp_float> d_dm_list;
+    device_vector_wrapper<dedisp_float> d_delay_table;
+    device_vector_wrapper<dedisp_bool> d_killmask;
+    device_vector_wrapper<dedisp_size> d_scrunch_list;
     //StreamType stream;
 	// Scrunching parameters
 	dedisp_bool  scrunching_enabled;
@@ -347,6 +350,7 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
 dedisp_error dedisp_set_device(int device_idx) {
 	try {
         dpct::dev_mgr::instance().select_device(device_idx);
+        execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
 #if defined(DEDISP_DEBUG) && DEDISP_DEBUG
         printf("Currently using device %s\n", dpct::dev_mgr::instance().current_device().get_info<sycl::info::device::name>().c_str());
 #endif
@@ -575,10 +579,10 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	dedisp_word*       d_transposed = 0;
 	dedisp_word*       d_unpacked = 0;
 	dedisp_byte*       d_out = 0;
-    dpct::device_vector<dedisp_word> d_in_buf;
-    dpct::device_vector<dedisp_word> d_transposed_buf;
-    dpct::device_vector<dedisp_word> d_unpacked_buf;
-    dpct::device_vector<dedisp_byte> d_out_buf;
+    device_vector_wrapper<dedisp_word> d_in_buf;
+    device_vector_wrapper<dedisp_word> d_transposed_buf;
+    device_vector_wrapper<dedisp_word> d_unpacked_buf;
+    device_vector_wrapper<dedisp_byte> d_out_buf;
     // Allocate temporary buffers on the device where necessary
 	if( using_host_memory || !friendly_in_stride ) {
 		try { d_in_buf.resize(in_count_gulp_max); }
@@ -806,7 +810,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 			//         Need to avoid assumption that scrunch starts at 1
 			//         Must start the scrunch at the first *requested* DM
 
-                        dpct::device_vector<dedisp_float> d_scrunched_dm_list(dm_count);
+                        device_vector_wrapper<dedisp_float> d_scrunched_dm_list(dm_count);
                         dedisp_size scrunch_start = 0;
 			dedisp_size scrunch_offset = 0;
 			for( dedisp_size s=0; s<dm_count; ++s ) {
@@ -821,7 +825,6 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 					// Note: This has the effect of increasing dt in the delay eqn
 					dedisp_size dm_offset = first_dm_idx + scrunch_start;
                     
-                    auto execution_policy = ::sycl::sycl_execution_policy(dpct::dev_mgr::instance().current_device().default_queue());
                     ::sycl::impl::transform(
                         execution_policy,
                         plan->d_dm_list.begin() + dm_offset,
