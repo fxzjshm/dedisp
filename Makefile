@@ -14,7 +14,7 @@ OPTIMISE  := -O3
 DEBUG     := -g -DDEDISP_DEBUG=$(DEDISP_DEBUG) #-G
 
 INCLUDE   := -I$(SRC_DIR) -I$(THRUST_DIR)
-LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lcudart -lstdc++
+LIB       := -L$(CUDA_DIR)/$(LIB_ARCH) -lstdc++
 
 SOURCES   := $(SRC_DIR)/dedisp.cu
 HEADERS   := $(SRC_DIR)/dedisp.h $(SRC_DIR)/kernels.cuh         \
@@ -42,8 +42,8 @@ $(SO_NAME): $(SOURCES) $(HEADERS)
 	mkdir -p $(INCLUDE_DIR)
 	mkdir -p $(LIB_DIR)
 	mkdir -p $(OBJ_DIR)
-	$(NVCC) -c -Xcompiler "-fPIC -Wall" $(OPTIMISE) $(DEBUG) -arch=$(GPU_ARCH) $(INCLUDE) -o $(OBJ_DIR)/dedisp.o $(SRC_DIR)/dedisp.cu
-	$(GCC) -shared -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -o $(SO_NAME) $(OBJ_DIR)/dedisp.o $(LIB)
+	$(NVCC) -x hip -c -fPIC -Wall $(OPTIMISE) $(DEBUG) --offload-arch=$(GPU_ARCH) $(INCLUDE) -o $(OBJ_DIR)/dedisp.o $(SRC_DIR)/dedisp.cu
+	$(NVCC) -shared -Wl,--version-script=libdedisp.version,-soname,$(LIB_NAME)$(SO_EXT).$(MAJOR) -o $(SO_NAME) $(OBJ_DIR)/dedisp.o $(LIB)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT).$(MAJOR)
 	ln -s -f $(SO_FILE) $(LIB_DIR)/$(LIB_NAME)$(SO_EXT)
 	cp $(INTERFACE) $(INCLUDE_DIR)

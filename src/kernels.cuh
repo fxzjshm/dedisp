@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /*
  *  Copyright 2012 Ben Barsdell
  *
@@ -27,7 +28,7 @@
 #include <thrust/iterator/counting_iterator.h>
 
 // CUDA deprecations
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #if CUDART_VERSION < 12000
 #define DEDISP_HAVE_TEXTURE_SUPPORT
 #endif
@@ -42,7 +43,7 @@ __constant__ dedisp_bool  c_killmask[DEDISP_MAX_NCHANS];
 
 #ifdef DEDISP_HAVE_TEXTURE_SUPPORT
 // Texture reference for input data
-texture<dedisp_word, 1, cudaReadModeElementType> t_in;
+texture<dedisp_word, 1, hipReadModeElementType> t_in;
 #endif
 
 template<int NBITS, typename T=unsigned int>
@@ -319,9 +320,9 @@ bool check_use_texture_mem() {
 #ifdef DEDISP_HAVE_TEXTURE_SUPPORT
 	// Decides based on GPU architecture
 	int device_idx;
-	cudaGetDevice(&device_idx);
-	cudaDeviceProp device_props;
-	cudaGetDeviceProperties(&device_props, device_idx);
+	hipGetDevice(&device_idx);
+	hipDeviceProp_t device_props;
+	hipGetDeviceProperties(&device_props, device_idx);
 	// Fermi runs worse with texture mem
 	bool use_texture_mem = (device_props.major < 2);
 	return use_texture_mem;
@@ -372,12 +373,12 @@ bool dedisperse(const dedisp_word*  d_in,
 			return false;
 		}
 		// Bind the texture memory
-		cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<dedisp_word>();
-		cudaBindTexture(0, t_in, d_in, channel_desc,
+		hipChannelFormatDesc channel_desc = hipCreateChannelDesc<dedisp_word>();
+		hipBindTexture(0, t_in, d_in, channel_desc,
 						input_words * sizeof(dedisp_word));
 #ifdef DEDISP_DEBUG
-		cudaError_t cuda_error = cudaGetLastError();
-		if( cuda_error != cudaSuccess ) {
+		hipError_t cuda_error = hipGetLastError();
+		if( cuda_error != hipSuccess ) {
 			return false;
 		}
 #endif // DEDISP_DEBUG
@@ -410,7 +411,7 @@ bool dedisperse(const dedisp_word*  d_in,
 	// Divide and round up
 	dedisp_size nsamps_reduced = (nsamps - 1) / DEDISP_SAMPS_PER_THREAD + 1;
 	
-	cudaStream_t stream = 0;
+	hipStream_t stream = 0;
 	
 	// Execute the kernel
 #define DEDISP_CALL_KERNEL(NBITS, USE_TEXTURE_MEM)						\
@@ -464,10 +465,10 @@ bool dedisperse(const dedisp_word*  d_in,
 		
 	// Check for kernel errors
 #ifdef DEDISP_DEBUG
-	//cudaStreamSynchronize(stream);
-	cudaDeviceSynchronize();
-	cudaError_t cuda_error = cudaGetLastError();
-	if( cuda_error != cudaSuccess ) {
+	//hipStreamSynchronize(stream);
+	hipDeviceSynchronize();
+	hipError_t cuda_error = hipGetLastError();
+	if( cuda_error != hipSuccess ) {
 		return false;
 	}
 #endif // DEDISP_DEBUG

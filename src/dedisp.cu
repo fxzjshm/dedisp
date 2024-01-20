@@ -130,7 +130,7 @@ dedisp_error throw_error(dedisp_error error) {
 */
 
 dedisp_error update_scrunch_list(dedisp_plan plan) {
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	if( !plan->scrunching_enabled || 0 == plan->dm_count ) {
@@ -182,12 +182,12 @@ dedisp_error dedisp_create_plan(dedisp_plan* plan_,
 	// Initialise to NULL for safety
 	*plan_ = 0;
 	
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
 	int device_idx;
-	cudaGetDevice(&device_idx);
+	hipGetDevice(&device_idx);
 	
 	// Check for parameter errors
 	if( nchans > DEDISP_MAX_NCHANS ) {
@@ -270,7 +270,7 @@ dedisp_error dedisp_set_dm_list(dedisp_plan plan,
 	if( !dm_list ) {
 		throw_error(DEDISP_INVALID_POINTER);
 	}
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
@@ -304,7 +304,7 @@ dedisp_error dedisp_generate_dm_list(dedisp_plan plan,
                                      dedisp_float ti, dedisp_float tol)
 {
 	if( !plan ) { throw_error(DEDISP_INVALID_PLAN); }
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
@@ -352,19 +352,19 @@ dedisp_float * dedisp_generate_dm_list_guru (dedisp_float dm_start, dedisp_float
 }
 
 dedisp_error dedisp_set_device(int device_idx) {
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
-	cudaError_t error = cudaSetDevice(device_idx);
-	// Note: cudaErrorInvalidValue isn't a documented return value, but
+	hipError_t error = hipSetDevice(device_idx);
+	// Note: hipErrorInvalidValue isn't a documented return value, but
 	//         it still gets returned :/
-	if( cudaErrorInvalidDevice == error ||
-		cudaErrorInvalidValue == error )
+	if( hipErrorInvalidDevice == error ||
+		hipErrorInvalidValue == error )
 		throw_error(DEDISP_INVALID_DEVICE_INDEX);
-	else if( cudaErrorSetOnActiveProcess == error )
+	else if( hipErrorSetOnActiveProcess == error )
 		throw_error(DEDISP_DEVICE_ALREADY_SET);
-	else if( cudaSuccess != error )
+	else if( hipSuccess != error )
 		throw_error(DEDISP_UNKNOWN_ERROR);
 	else
 		return DEDISP_NO_ERROR;
@@ -373,7 +373,7 @@ dedisp_error dedisp_set_device(int device_idx) {
 dedisp_error dedisp_set_killmask(dedisp_plan plan, const dedisp_bool* killmask)
 {
 	if( !plan ) { throw_error(DEDISP_INVALID_PLAN); }
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	if( 0 != killmask ) {
@@ -457,7 +457,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
                                  unsigned           flags)
 {
 	if( !plan ) { throw_error(DEDISP_INVALID_PLAN); }
-	if( cudaGetLastError() != cudaSuccess ) {
+	if( hipGetLastError() != hipSuccess ) {
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	}
 	
@@ -515,22 +515,22 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 	// Copy the lookup tables to constant memory on the device
 	// TODO: This was much tidier, but thanks to CUDA's insistence on
 	//         breaking its API in v5.0 I had to mess it up like this.
-	cudaMemcpyToSymbolAsync(c_delay_table,
+	hipMemcpyToSymbolAsync(HIP_SYMBOL(c_delay_table),
 	                        thrust::raw_pointer_cast(&plan->d_delay_table[0]),
 							plan->nchans * sizeof(dedisp_float),
-							0, cudaMemcpyDeviceToDevice, 0);
-	cudaDeviceSynchronize();
-	cudaError_t error = cudaGetLastError();
-	if( error != cudaSuccess ) {
+							0, hipMemcpyDeviceToDevice, 0);
+	hipDeviceSynchronize();
+	hipError_t error = hipGetLastError();
+	if( error != hipSuccess ) {
 		throw_error(DEDISP_MEM_COPY_FAILED);
 	}
-	cudaMemcpyToSymbolAsync(c_killmask,
+	hipMemcpyToSymbolAsync(HIP_SYMBOL(c_killmask),
 	                        thrust::raw_pointer_cast(&plan->d_killmask[0]),
 							plan->nchans * sizeof(dedisp_bool),
-							0, cudaMemcpyDeviceToDevice, 0);
-	cudaDeviceSynchronize();
-	error = cudaGetLastError();
-	if( error != cudaSuccess ) {
+							0, hipMemcpyDeviceToDevice, 0);
+	hipDeviceSynchronize();
+	error = hipGetLastError();
+	if( error != hipSuccess ) {
 		throw_error(DEDISP_MEM_COPY_FAILED);
 	}
 	
@@ -654,7 +654,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif //  USE_SUBBAND_ALGORITHM
 	
 	// TODO: Eventually re-implement streams
-	cudaStream_t stream = 0;//(cudaStream_t)plan->stream;
+	hipStream_t stream = 0;//(hipStream_t)plan->stream;
 	
 #ifdef DEDISP_BENCHMARK
 	Stopwatch copy_to_timer;
@@ -702,7 +702,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 			}
 		}
 #ifdef DEDISP_BENCHMARK
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		copy_to_timer.stop();
 		transpose_timer.start();
 #endif
@@ -713,7 +713,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 		                    in_buf_stride_words, nsamps_padded_gulp,
 		                    d_transposed);
 #ifdef DEDISP_BENCHMARK
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		transpose_timer.stop();
 		
 		kernel_timer.start();
@@ -896,7 +896,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif // SB/direct algorithm
 
 #ifdef DEDISP_BENCHMARK
-		cudaDeviceSynchronize();
+		hipDeviceSynchronize();
 		kernel_timer.stop();
 #endif
 		// Copy output back to host memory if necessary
@@ -940,7 +940,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 				                       dm_count);                 // height
 			}
 #ifdef DEDISP_BENCHMARK
-			cudaDeviceSynchronize();
+			hipDeviceSynchronize();
 			copy_from_timer.stop();
 #endif
 		}
@@ -966,7 +966,7 @@ dedisp_error dedisp_execute_guru(const dedisp_plan  plan,
 #endif
 	
 	if( !(flags & DEDISP_ASYNC) ) {
-		cudaStreamSynchronize(stream);
+		hipStreamSynchronize(stream);
 	}
 	
 	// Phew!
@@ -1022,7 +1022,7 @@ dedisp_error dedisp_execute(const dedisp_plan  plan,
 
 dedisp_error dedisp_sync(void)
 {
-	if( cudaDeviceSynchronize() != cudaSuccess )
+	if( hipDeviceSynchronize() != hipSuccess )
 		throw_error(DEDISP_PRIOR_GPU_ERROR);
 	else
 		return DEDISP_NO_ERROR;
